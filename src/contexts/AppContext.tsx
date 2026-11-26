@@ -165,27 +165,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!user) return;
     const live = profiles.find((p) => p.id === user.id);
     if (!live) return;
-    if (live.active !== true) {
-      setCurrentSessionUser(null);
-      setUser(null);
-      setNoAccess(true);
-      return;
-    }
     if (
       live.full_name !== user.full_name ||
       live.full_name_ar !== user.full_name_ar ||
-      live.email !== user.email ||
-      live.role !== user.role ||
       live.team !== user.team ||
       live.phone !== user.phone ||
-      live.avatar_url !== user.avatar_url ||
-      live.can_access_commercial_overheads !==
-        user.can_access_commercial_overheads ||
-      JSON.stringify(live.module_permissions || {}) !==
-        JSON.stringify(user.module_permissions || {})
+      live.avatar_url !== user.avatar_url
     ) {
-      setCurrentSessionUser(live);
-      setUser(live);
+      const next: Profile = {
+        ...user,
+        full_name: live.full_name,
+        full_name_ar: live.full_name_ar,
+        team: live.team,
+        phone: live.phone,
+        avatar_url: live.avatar_url,
+      };
+      setCurrentSessionUser(next);
+      setUser(next);
     }
   }, [profiles, user]);
 
@@ -205,25 +201,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
-    const { data: row, error: profileErr } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', sub)
-      .maybeSingle();
+    try {
+      const { data: row, error: profileErr } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', sub)
+        .maybeSingle();
 
-    if (profileErr || !row || row.active !== true) {
-      setCurrentSessionUser(null);
-      setUser(null);
-      setNoAccess(true);
+      if (profileErr) {
+        setLoading(false);
+        return;
+      }
+
+      if (!row || row.active !== true) {
+        setCurrentSessionUser(null);
+        setUser(null);
+        setNoAccess(true);
+        setLoading(false);
+        return;
+      }
+
+      const normalized = normalizeProfileRow(row as Profile);
+      setCurrentSessionUser(normalized);
+      setNoAccess(false);
+      setUser(normalized);
       setLoading(false);
-      return;
+    } catch {
+      setLoading(false);
     }
-
-    const normalized = normalizeProfileRow(row as Profile);
-    setCurrentSessionUser(normalized);
-    setNoAccess(false);
-    setUser(normalized);
-    setLoading(false);
   }, []);
 
   // Run refresh() on mount and on window 'focus', and handle 'SIGNED_OUT'
