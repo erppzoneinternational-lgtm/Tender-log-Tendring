@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -9,14 +9,10 @@ import {
   Menu,
   Monitor,
   Moon,
-  RotateCcw,
   Search,
-  ShieldCheck,
   Sun,
-  UserPlus,
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
-import { getProfiles, subscribeDataStore } from '@/lib/dataStore';
 import { type ThemeMode, type UserRole } from '@/types/database';
 
 const ROLE_BADGE_STYLES: Record<UserRole, string> = {
@@ -43,9 +39,6 @@ export const Topbar: React.FC = () => {
   const navigate = useNavigate();
   const {
     user,
-    authenticatedUser,
-    isRealAppAdmin,
-    isSwitchingUser,
     theme,
     setTheme,
     language,
@@ -53,20 +46,8 @@ export const Topbar: React.FC = () => {
     setMobileMenuOpen,
     setCommandPaletteOpen,
     unreadNotificationsCount,
-    switchActiveUser,
-    resetSwitchedUser,
     signOut,
   } = useApp();
-  const [storeVersion, setStoreVersion] = useState(0);
-
-  useEffect(() => {
-    return subscribeDataStore(() => setStoreVersion((v) => v + 1));
-  }, []);
-
-  const activeUsers = useMemo(() => {
-    void storeVersion;
-    return getProfiles().filter((p) => p.active);
-  }, [storeVersion]);
 
   const themeOptions: { mode: ThemeMode; icon: typeof Sun; label: string }[] = [
     { mode: 'light', icon: Sun, label: t('topbar.themeLight') },
@@ -104,7 +85,7 @@ export const Topbar: React.FC = () => {
         </kbd>
       </button>
 
-      {/* Right / End Controls: App Admin User Switcher, Language, Theme, Bell, User */}
+      {/* Right / End Controls: Language, Theme, Bell, User */}
       <div className="flex items-center gap-2 shrink-0">
         {/* Read-only lock indicator for Viewers */}
         {user?.role === 'viewer' && (
@@ -112,75 +93,6 @@ export const Topbar: React.FC = () => {
             <Lock className="w-3.5 h-3.5" />
             {t('topbar.readOnlyBadge')}
           </span>
-        )}
-
-        {/* App Admin Exclusive User Switcher — Strictly hidden from all non-App-Admin users */}
-        {user && isRealAppAdmin && (
-          <div
-            className={`hidden lg:flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-xl border shrink-0 ${
-              isSwitchingUser
-                ? 'bg-pzone-magenta/12 border-pzone-magenta/40'
-                : 'bg-gradient-to-r from-pzone-teal/15 via-pzone-seagreen/10 to-pzone-magenta/15 border-pzone-teal/30'
-            }`}
-          >
-            <ShieldCheck
-              className={`w-3.5 h-3.5 shrink-0 ${
-                isSwitchingUser ? 'text-pzone-magenta' : 'text-pzone-teal'
-              }`}
-            />
-            <span className="hidden 2xl:inline text-[10px] font-mono font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap shrink-0">
-              {isSwitchingUser
-                ? language === 'ar'
-                  ? 'عرض بصلاحية:'
-                  : 'Viewing as:'
-                : language === 'ar'
-                  ? 'تبديل المستخدم:'
-                  : 'Switch User:'}
-            </span>
-            <select
-              aria-label="App Admin User Switcher"
-              value={user.id}
-              onChange={(e) => switchActiveUser(e.target.value)}
-              className="bg-transparent text-foreground font-bold rounded-lg px-1 py-0.5 focus:outline-none text-xs cursor-pointer max-w-[175px] xl:max-w-[205px] truncate"
-            >
-              {activeUsers.map((p) => {
-                const isSelfAdmin = authenticatedUser?.id === p.id;
-                const baseLabel =
-                  language === 'ar' && p.full_name_ar
-                    ? `${p.full_name_ar} — ${t(`roles.${p.role}`)}`
-                    : `${p.full_name} — ${t(`roles.${p.role}`)}`;
-                return (
-                  <option key={p.id} value={p.id} className="bg-card text-foreground">
-                    {isSelfAdmin ? `${baseLabel} (Admin)` : baseLabel}
-                  </option>
-                );
-              })}
-            </select>
-
-            {isSwitchingUser ? (
-              <button
-                type="button"
-                onClick={resetSwitchedUser}
-                title="Return to your App Admin account"
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-pzone-magenta text-white text-[10px] font-bold hover:opacity-90 transition-opacity shrink-0"
-              >
-                <RotateCcw className="w-3 h-3" />
-                <span>{language === 'ar' ? 'رجوع' : 'Admin'}</span>
-              </button>
-            ) : (
-              activeUsers.length <= 1 && (
-                <button
-                  type="button"
-                  onClick={() => navigate('/admin/users')}
-                  title="Add team members in Admin → Users to switch between users"
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-pzone-teal/20 hover:bg-pzone-teal/30 text-pzone-teal text-[10px] font-bold border border-pzone-teal/30 transition-colors shrink-0"
-                >
-                  <UserPlus className="w-3 h-3" />
-                  <span>{language === 'ar' ? '+ فريق' : '+ Users'}</span>
-                </button>
-              )
-            )}
-          </div>
         )}
 
         {/* Arabic / English Toggle */}
