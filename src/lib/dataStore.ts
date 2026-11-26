@@ -28,17 +28,13 @@ import type {
   TenderDocument,
   UserRole,
 } from '@/types/database';
-import { ALL_USER_ROLES, ROLE_DEFAULT_TEAM } from '@/types/database';
+import { ALL_USER_ROLES } from '@/types/database';
 import {
   DEFAULT_EXCHANGE_RATES,
   DEFAULT_LOOKUP_VALUES,
-  PRIMARY_APP_ADMIN_EMAIL,
-  SEEDED_PROFILES,
+  isSupabaseConfigured,
+  supabase,
 } from '@/lib/supabaseClient';
-import {
-  deleteErpAllowlistUser,
-  syncErpAllowlistUsers,
-} from '@/lib/supabase';
 import {
   SEEDED_ASSIGNMENTS,
   SEEDED_COMMENTS,
@@ -52,7 +48,6 @@ import {
   canAccessCommercialOverheads,
   canAddComment,
   canAssignEngineers,
-  canAssignRole,
   canCreateRevision,
   canCreateTender,
   canEditComponents,
@@ -60,13 +55,11 @@ import {
   canManageAdmin,
   canManageDocuments,
   canManageFxAndCatalog,
-  canManageTargetUser,
   canManageUsers,
   canMoveKanbanCard,
   canViewKanbanAndTeamManagement,
   getEffectiveModulePermissions,
   hasFullTenderAuthority,
-  ROLE_DEFAULT_MODULE_PERMISSIONS,
   isAssignableEngineerOrManager,
   isEngineerRole,
 } from '@/lib/permissions';
@@ -104,7 +97,6 @@ const STORAGE_KEYS = {
 } as const;
 
 const STORAGE_KEY_TO_SUPABASE_TABLE: Partial<Record<string, SyncTableKey>> = {
-  [STORAGE_KEYS.PROFILES]: 'profiles',
   [STORAGE_KEYS.LOOKUPS]: 'lookup_values',
   [STORAGE_KEYS.FX_RATES]: 'exchange_rates',
   [STORAGE_KEYS.AUDIT_LOG]: 'audit_log',
@@ -465,47 +457,19 @@ export function clearAuditLogs(): void {
 }
 
 // =============================================================================
-// 1. PROFILES / USERS CRUD & GOOGLE GMAIL ALLOWLIST (Section 3 & Section 5.7)
+// 1. PROFILES / USERS READ & ALLOWED SELF / TEAM UPDATES
+// Users, roles, active status, and module permissions are managed in the Portal Console
+// and read from the `tender.profiles` view.
 // =============================================================================
 
-const EMAIL_FORMAT_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+let currentSessionUser: Profile | null = null;
 
-export function normalizeGoogleEmail(email: string): string {
-  return email
-    .trim()
-    .toLowerCase()
-    .replace(/@googlemail\.com$/i, '@gmail.com');
+export function setCurrentSessionUser(profile: Profile | null): void {
+  currentSessionUser = profile;
 }
 
-export interface GoogleAuthCheckResult {
-  allowed: boolean;
-  profile?: Profile;
-  reason?: 'invalid_email' | 'not_in_list' | 'inactive';
-}
-
-/**
- * Checks whether a Google / Gmail address is pre-authorized in the Admin Users list.
- * Only users explicitly added in Admin with `active === true` are permitted to sign in.
- */
-export function authorizeGoogleUser(email: string): GoogleAuthCheckResult {
-  const normalized = normalizeGoogleEmail(email || '');
-  if (!normalized || !EMAIL_FORMAT_REGEX.test(normalized)) {
-    return { allowed: false, reason: 'invalid_email' };
-  }
-
-  const matched = getProfiles().find(
-    (p) => normalizeGoogleEmail(p.email) === normalized
-  );
-
-  if (!matched) {
-    return { allowed: false, reason: 'not_in_list' };
-  }
-
-  if (!matched.active) {
-    return { allowed: false, profile: matched, reason: 'inactive' };
-  }
-
-  return { allowed: true, profile: matched };
+export function getCurrentSessionUser(): Profile | null {
+  return currentSessionUser;
 }
 
 function normalizeStoredRole(rawRole: string, team?: string | null): UserRole {
@@ -521,206 +485,28 @@ function normalizeStoredRole(rawRole: string, team?: string | null): UserRole {
   return 'viewer';
 }
 
-const USER_OVERHEADS_ACCESS_CATEGORY = 'user_overheads_access';
-const USER_ACCESS_MATRIX_CATEGORY = 'user_access_matrix';
+export function normalizeProfileRow(p: Profile): Profile {
+  const role = normalizeStoredRole(p.role as unknown as string, p.team);
+  const effective = getEffectiveModulePermissions({
+    role,
+    module_permissions: p.module_permissions,
+    can_access_commercial_overheads: p.can_access_commercial_overheads,
+  });
 
-function syncUserAccessMatrixLookup(
-  email: string,
-  rolePreset: UserRole,
-  modulePermissions: Partial<ModulePermissions> | undefined,
-  actorId: string
-): void {
-  const cleanEmail = normalizeGoogleEmail(email);
-  if (!cleanEmail) return;
-  const allLookups = readStorage<LookupValue[]>(
-    STORAGE_KEYS.LOOKUPS,
-    DEFAULT_LOOKUP_VALUES
-  );
-  const existingIdx = allLookups.findIndex(
-    (lv) =>
-      lv.category === USER_ACCESS_MATRIX_CATEGORY &&
-      lv.code.toLowerCase() === cleanEmail
-  );
-  const now = nowCairoIso();
-  const cleanMatrix: Record<string, string> = {};
-  if (modulePermissions) {
-    for (const [k, v] of Object.entries(modulePermissions)) {
-      if (v === 'hidden' || v === 'view' || v === 'edit') {
-        cleanMatrix[k] = v;
-      }
-    }
-  }
-  const metadataPayload = {
-    role_preset: rolePreset,
-    module_permissions: cleanMatrix,
-  } as unknown as LookupValue['metadata'];
-
-  if (existingIdx >= 0) {
-    const next = [...allLookups];
-    next[existingIdx] = {
-      ...next[existingIdx],
-      metadata: metadataPayload,
-      active: true,
-      updated_by: actorId,
-      updated_at: now,
-    };
-    writeStorage(STORAGE_KEYS.LOOKUPS, next);
-  } else {
-    const created: LookupValue = {
-      id: generateUuid(),
-      category: USER_ACCESS_MATRIX_CATEGORY,
-      code: cleanEmail,
-      label_en: cleanEmail,
-      label_ar: cleanEmail,
-      color: '#1E9090',
-      sort_order: 1,
-      metadata: metadataPayload,
-      active: true,
-      created_by: actorId,
-      created_at: now,
-      updated_by: actorId,
-      updated_at: now,
-    };
-    writeStorage(STORAGE_KEYS.LOOKUPS, [...allLookups, created]);
-  }
+  return {
+    ...p,
+    role,
+    module_permissions: p.module_permissions ?? effective,
+    can_access_commercial_overheads:
+      typeof p.can_access_commercial_overheads === 'boolean'
+        ? p.can_access_commercial_overheads
+        : effective.erp_overheads !== 'hidden',
+  };
 }
-
-function syncOverheadsAccessLookup(
-  email: string,
-  allowed: boolean,
-  actorId: string
-): void {
-  const cleanEmail = normalizeGoogleEmail(email);
-  if (!cleanEmail) return;
-  const allLookups = readStorage<LookupValue[]>(
-    STORAGE_KEYS.LOOKUPS,
-    DEFAULT_LOOKUP_VALUES
-  );
-  const existingIdx = allLookups.findIndex(
-    (lv) =>
-      lv.category === USER_OVERHEADS_ACCESS_CATEGORY &&
-      lv.code.toLowerCase() === cleanEmail
-  );
-  const now = nowCairoIso();
-  if (existingIdx >= 0) {
-    const next = [...allLookups];
-    next[existingIdx] = {
-      ...next[existingIdx],
-      active: allowed,
-      updated_by: actorId,
-      updated_at: now,
-    };
-    writeStorage(STORAGE_KEYS.LOOKUPS, next);
-  } else if (allowed) {
-    const created: LookupValue = {
-      id: generateUuid(),
-      category: USER_OVERHEADS_ACCESS_CATEGORY,
-      code: cleanEmail,
-      label_en: cleanEmail,
-      label_ar: cleanEmail,
-      color: '#1E9090',
-      sort_order: 1,
-      metadata: {},
-      active: true,
-      created_by: actorId,
-      created_at: now,
-      updated_by: actorId,
-      updated_at: now,
-    };
-    writeStorage(STORAGE_KEYS.LOOKUPS, [...allLookups, created]);
-  }
-}
-
-const REMOVED_DEMO_PROFILE_IDS = new Set([
-  '00000000-0000-4000-8000-000000000002',
-  '00000000-0000-4000-8000-000000000003',
-  '00000000-0000-4000-8000-000000000004',
-  '00000000-0000-4000-8000-000000000005',
-  '00000000-0000-4000-8000-000000000006',
-  '00000000-0000-4000-8000-000000000007',
-  '00000000-0000-4000-8000-000000000008',
-]);
-
-const REMOVED_DEMO_EMAILS = new Set([
-  'admin@pzone.com',
-  'pm@pzone.com',
-  'civil.engineer@pzone.com',
-  'mech.engineer@pzone.com',
-  'elec.engineer@pzone.com',
-  'estimator1@pzone.com',
-  'director@pzone.com',
-]);
 
 export function getProfiles(): Profile[] {
-  const raw = readStorage<Profile[]>(STORAGE_KEYS.PROFILES, SEEDED_PROFILES);
-  const cleanedRaw = raw.filter(
-    (p) =>
-      !REMOVED_DEMO_PROFILE_IDS.has(p.id) &&
-      !REMOVED_DEMO_EMAILS.has(normalizeGoogleEmail(p.email))
-  );
-  if (cleanedRaw.length !== raw.length) {
-    persistCacheOnly(STORAGE_KEYS.PROFILES, cleanedRaw);
-  }
-  const existingEmails = new Set(
-    cleanedRaw.map((p) => normalizeGoogleEmail(p.email))
-  );
-  const merged = [...cleanedRaw];
-  for (const seeded of SEEDED_PROFILES) {
-    if (!existingEmails.has(normalizeGoogleEmail(seeded.email))) {
-      merged.push(seeded);
-    }
-  }
-  const allLookups = readStorage<LookupValue[]>(
-    STORAGE_KEYS.LOOKUPS,
-    DEFAULT_LOOKUP_VALUES
-  );
-  const overheadsLookupMap = new Map<string, boolean>();
-  const matrixLookupMap = new Map<
-    string,
-    { role_preset?: UserRole; module_permissions?: Partial<ModulePermissions> }
-  >();
-  for (const lv of allLookups) {
-    if (lv.category === USER_OVERHEADS_ACCESS_CATEGORY && lv.code) {
-      overheadsLookupMap.set(lv.code.toLowerCase(), Boolean(lv.active));
-    } else if (lv.category === USER_ACCESS_MATRIX_CATEGORY && lv.code && lv.active) {
-      const meta = (lv.metadata || {}) as {
-        role_preset?: UserRole;
-        module_permissions?: Partial<ModulePermissions>;
-      };
-      matrixLookupMap.set(lv.code.toLowerCase(), meta);
-    }
-  }
-
-  return merged.map((p) => {
-    const cleanEmail = normalizeGoogleEmail(p.email);
-    const matrixMeta = matrixLookupMap.get(cleanEmail);
-    const candidateRole =
-      matrixMeta?.role_preset &&
-      (ALL_USER_ROLES as readonly string[]).includes(matrixMeta.role_preset)
-        ? matrixMeta.role_preset
-        : normalizeStoredRole(p.role as unknown as string, p.team);
-
-    const lookupFlag = overheadsLookupMap.get(cleanEmail);
-    const mergedModulePerms: Partial<ModulePermissions> = {
-      ...(p.module_permissions || {}),
-      ...(matrixMeta?.module_permissions || {}),
-    };
-
-    const effective = getEffectiveModulePermissions({
-      role: candidateRole,
-      module_permissions: mergedModulePerms,
-      can_access_commercial_overheads:
-        lookupFlag !== undefined ? lookupFlag : p.can_access_commercial_overheads,
-    });
-
-    return {
-      ...p,
-      role: candidateRole,
-      module_permissions:
-        candidateRole === 'app_admin' ? undefined : mergedModulePerms,
-      can_access_commercial_overheads: effective.erp_overheads !== 'hidden',
-    };
-  });
+  const raw = readStorage<Profile[]>(STORAGE_KEYS.PROFILES, []);
+  return raw.map(normalizeProfileRow);
 }
 
 export function getProfileName(userId?: string | null, lang: 'en' | 'ar' = 'en'): string {
@@ -736,150 +522,41 @@ export function getProfileName(userId?: string | null, lang: 'en' | 'ar' = 'en')
       (u.full_name_ar && u.full_name_ar.trim() === clean)
   );
   if (p) return lang === 'ar' && p.full_name_ar ? p.full_name_ar : p.full_name;
-  // If `userId` is already a human-readable actor name (not an unmapped UUID), display it
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clean)) {
     return clean;
   }
   return '—';
 }
 
-export function inviteOrCreateUser(
-  input: {
-    full_name: string;
-    full_name_ar?: string;
-    email: string;
-    phone?: string;
-    role: UserRole;
-    team?: string;
-    module_permissions?: Partial<ModulePermissions>;
-    can_access_commercial_overheads?: boolean;
-  },
-  actor: ActorContext
-): Profile {
-  assertUserManagementPermission(actor, 'inviteOrCreateUser');
+export type EditableProfilePatch = Partial<
+  Pick<
+    Profile,
+    | 'team'
+    | 'full_name'
+    | 'full_name_ar'
+    | 'phone'
+    | 'avatar_url'
+    | 'preferred_theme'
+    | 'preferred_lang'
+  >
+>;
 
-  if (!canAssignRole(actor.role, input.role)) {
-    throw new Error(
-      'Permission denied: Only an App Admin has authority to assign the App Admin role.'
-    );
-  }
-
-  const cleanName = input.full_name.trim();
-  if (!cleanName) {
-    throw new Error('Full Name is required.');
-  }
-
-  const normalizedEmail = normalizeGoogleEmail(input.email);
-  if (!EMAIL_FORMAT_REGEX.test(normalizedEmail)) {
-    throw new Error('Please enter a valid Gmail or Google email address (e.g. name@gmail.com).');
-  }
-
-  const profiles = getProfiles();
-  const now = nowCairoIso();
-  const baseMatrix = ROLE_DEFAULT_MODULE_PERMISSIONS[input.role];
-  const customMatrix: Partial<ModulePermissions> =
-    input.role === 'app_admin' ? {} : { ...(input.module_permissions || {}) };
-  if (
-    input.role !== 'app_admin' &&
-    customMatrix.erp_overheads === undefined &&
-    input.can_access_commercial_overheads !== undefined
-  ) {
-    customMatrix.erp_overheads = input.can_access_commercial_overheads
-      ? 'edit'
-      : 'hidden';
-  }
-  const overheadsAllowed =
-    (customMatrix.erp_overheads ?? baseMatrix.erp_overheads) !== 'hidden';
-
-  // Smart Upsert: if a user with this Gmail already exists in `profiles`, update & activate them
-  // with the configured name, role, and permission matrix instead of failing with a duplicate error.
-  const existingByEmail = profiles.find(
-    (p) => normalizeGoogleEmail(p.email) === normalizedEmail
-  );
-  if (existingByEmail) {
-    return updateUserProfile(
-      existingByEmail.id,
-      {
-        full_name: cleanName,
-        full_name_ar: input.full_name_ar?.trim() || existingByEmail.full_name_ar || null,
-        email: normalizedEmail,
-        phone: input.phone?.trim() || existingByEmail.phone || null,
-        role: input.role,
-        team: input.team?.trim() || ROLE_DEFAULT_TEAM[input.role],
-        active: true,
-        module_permissions: customMatrix,
-        can_access_commercial_overheads: overheadsAllowed,
-      },
-      actor
-    );
-  }
-
-  const newProfile: Profile = {
-    id: generateUuid(),
-    full_name: cleanName,
-    full_name_ar: input.full_name_ar?.trim() || null,
-    email: normalizedEmail,
-    phone: input.phone?.trim() || null,
-    role: input.role,
-    team: input.team?.trim() || ROLE_DEFAULT_TEAM[input.role],
-    preferred_theme: 'system',
-    preferred_lang: 'en',
-    active: true,
-    module_permissions: customMatrix,
-    can_access_commercial_overheads: overheadsAllowed,
-    created_at: now,
-    updated_at: now,
-  };
-
-  const updated = [...profiles, newProfile];
-  writeStorage(STORAGE_KEYS.PROFILES, updated);
-  syncOverheadsAccessLookup(normalizedEmail, overheadsAllowed, actor.id);
-  syncUserAccessMatrixLookup(normalizedEmail, input.role, customMatrix, actor.id);
-  void syncErpAllowlistUsers(getProfiles());
-
-  recordAuditEntry({
-    table_name: 'profiles',
-    record_id: newProfile.id,
-    actor,
-    action: 'INSERT',
-    old_data: null,
-    new_data: newProfile as unknown as Record<string, unknown>,
-  });
-
-  return newProfile;
-}
-
-export function updateUserProfile(
+export async function updateUserProfile(
   userId: string,
-  patch: Partial<
-    Pick<
-      Profile,
-      | 'full_name'
-      | 'full_name_ar'
-      | 'email'
-      | 'avatar_url'
-      | 'role'
-      | 'team'
-      | 'phone'
-      | 'active'
-      | 'module_permissions'
-      | 'can_access_commercial_overheads'
-      | 'preferred_theme'
-      | 'preferred_lang'
-    >
-  >,
+  patch: EditableProfilePatch,
   actor: ActorContext
-): Profile {
-  const isSelfPreferenceOnly =
-    actor.id === userId &&
-    patch.role === undefined &&
-    patch.active === undefined &&
-    patch.email === undefined &&
-    patch.module_permissions === undefined &&
-    patch.can_access_commercial_overheads === undefined;
-
-  if (!isSelfPreferenceOnly) {
+): Promise<Profile> {
+  const isSelf = actor.id === userId;
+  if (!isSelf) {
     assertUserManagementPermission(actor, 'updateUserProfile');
+  }
+  if (
+    !isSelf &&
+    (patch.preferred_theme !== undefined || patch.preferred_lang !== undefined)
+  ) {
+    throw new Error(
+      'Permission denied: preferred_theme and preferred_lang may only be updated on your own row.'
+    );
   }
 
   const profiles = getProfiles();
@@ -889,122 +566,54 @@ export function updateUserProfile(
   }
 
   const existing = profiles[idx];
+  const dbPatch: EditableProfilePatch = {};
 
-  if (!isSelfPreferenceOnly) {
-    if (!canManageTargetUser(actor.role, existing.role)) {
-      throw new Error(
-        'Permission denied: Only an App Admin has authority to modify user accounts or roles.'
-      );
-    }
-    if (patch.role !== undefined && !canAssignRole(actor.role, patch.role)) {
-      throw new Error(
-        'Permission denied: Only an App Admin has authority to assign roles.'
-      );
-    }
+  if (patch.team !== undefined) {
+    dbPatch.team = patch.team ? patch.team.trim() : null;
   }
-
-  // Prevent locking out the last active App Admin
-  const wouldRemoveAppAdminPower =
-    existing.role === 'app_admin' &&
-    existing.active &&
-    ((patch.role !== undefined && patch.role !== 'app_admin') ||
-      patch.active === false);
-
-  if (wouldRemoveAppAdminPower) {
-    const otherActiveAppAdmins = profiles.filter(
-      (p) => p.id !== userId && p.role === 'app_admin' && p.active
-    );
-    if (otherActiveAppAdmins.length === 0) {
-      throw new Error(
-        'Operation blocked: At least one active App Admin must remain in the system.'
-      );
-    }
-  }
-
-  const normalizedPatch = { ...patch };
-  if (normalizedPatch.role !== undefined && patch.team === undefined) {
-    normalizedPatch.team = ROLE_DEFAULT_TEAM[normalizedPatch.role];
-  }
-
-  if (normalizedPatch.email !== undefined) {
-    const cleanEmail = normalizeGoogleEmail(normalizedPatch.email);
-    if (!EMAIL_FORMAT_REGEX.test(cleanEmail)) {
-      throw new Error('Please enter a valid Gmail or Google email address (e.g. name@gmail.com).');
-    }
-    if (
-      profiles.some(
-        (p) => p.id !== userId && normalizeGoogleEmail(p.email) === cleanEmail
-      )
-    ) {
-      throw new Error(`A user with email '${cleanEmail}' already exists.`);
-    }
-    normalizedPatch.email = cleanEmail;
-  }
-
-  if (normalizedPatch.full_name !== undefined) {
-    const cleanName = normalizedPatch.full_name.trim();
+  if (patch.full_name !== undefined) {
+    const cleanName = patch.full_name.trim();
     if (!cleanName) {
       throw new Error('Full Name is required.');
     }
-    normalizedPatch.full_name = cleanName;
+    dbPatch.full_name = cleanName;
+  }
+  if (patch.full_name_ar !== undefined) {
+    dbPatch.full_name_ar = patch.full_name_ar ? patch.full_name_ar.trim() : null;
+  }
+  if (patch.phone !== undefined) {
+    dbPatch.phone = patch.phone ? patch.phone.trim() : null;
+  }
+  if (patch.avatar_url !== undefined) {
+    dbPatch.avatar_url = patch.avatar_url ?? null;
+  }
+  if (isSelf && patch.preferred_theme !== undefined) {
+    dbPatch.preferred_theme = patch.preferred_theme;
+  }
+  if (isSelf && patch.preferred_lang !== undefined) {
+    dbPatch.preferred_lang = patch.preferred_lang;
   }
 
-  if (
-    patch.can_access_commercial_overheads !== undefined &&
-    patch.module_permissions === undefined
-  ) {
-    normalizedPatch.module_permissions = {
-      ...(existing.module_permissions || {}),
-      erp_overheads: patch.can_access_commercial_overheads ? 'edit' : 'hidden',
-    };
+  if (isSupabaseConfigured && Object.keys(dbPatch).length > 0) {
+    const { error } = await supabase
+      .from('profiles')
+      .update(dbPatch)
+      .eq('id', userId);
+    if (error) {
+      throw new Error(error.message);
+    }
   }
-
-  const nextRole = normalizedPatch.role ?? existing.role;
-  const nextModulePerms =
-    nextRole === 'app_admin'
-      ? {}
-      : normalizedPatch.module_permissions !== undefined
-        ? normalizedPatch.module_permissions
-        : existing.module_permissions || {};
-  const effectiveAfter = getEffectiveModulePermissions({
-    role: nextRole,
-    module_permissions: nextModulePerms,
-    can_access_commercial_overheads:
-      normalizedPatch.can_access_commercial_overheads ??
-      existing.can_access_commercial_overheads,
-  });
 
   const updatedProfile: Profile = {
     ...existing,
-    ...normalizedPatch,
-    module_permissions: nextModulePerms,
-    can_access_commercial_overheads: effectiveAfter.erp_overheads !== 'hidden',
+    ...dbPatch,
     updated_at: nowCairoIso(),
   };
 
   const next = [...profiles];
   next[idx] = updatedProfile;
-  writeStorage(STORAGE_KEYS.PROFILES, next);
-  void syncErpAllowlistUsers(getProfiles());
-
-  if (
-    patch.can_access_commercial_overheads !== undefined ||
-    patch.module_permissions !== undefined ||
-    patch.role !== undefined ||
-    patch.email !== undefined
-  ) {
-    syncOverheadsAccessLookup(
-      updatedProfile.email,
-      Boolean(updatedProfile.can_access_commercial_overheads),
-      actor.id
-    );
-    syncUserAccessMatrixLookup(
-      updatedProfile.email,
-      updatedProfile.role,
-      updatedProfile.module_permissions,
-      actor.id
-    );
-  }
+  persistCacheOnly(STORAGE_KEYS.PROFILES, next);
+  notifyListeners();
 
   recordAuditEntry({
     table_name: 'profiles',
@@ -1016,50 +625,6 @@ export function updateUserProfile(
   });
 
   return updatedProfile;
-}
-
-export function deleteUserProfile(userId: string, actor: ActorContext): void {
-  assertUserManagementPermission(actor, 'deleteUserProfile');
-
-  if (actor.id === userId) {
-    throw new Error('You cannot remove your own currently signed-in account.');
-  }
-
-  const profiles = getProfiles();
-  const existing = profiles.find((p) => p.id === userId);
-  if (!existing) {
-    throw new Error('User profile not found');
-  }
-
-  if (!canManageTargetUser(actor.role, existing.role)) {
-    throw new Error(
-      'Permission denied: Only an App Admin has authority to remove user accounts.'
-    );
-  }
-
-  if (existing.role === 'app_admin' && existing.active) {
-    const otherActiveAppAdmins = profiles.filter(
-      (p) => p.id !== userId && p.role === 'app_admin' && p.active
-    );
-    if (otherActiveAppAdmins.length === 0) {
-      throw new Error(
-        'Operation blocked: Cannot remove the last active App Admin.'
-      );
-    }
-  }
-
-  const next = profiles.filter((p) => p.id !== userId);
-  writeStorage(STORAGE_KEYS.PROFILES, next);
-  void deleteErpAllowlistUser(existing.email);
-
-  recordAuditEntry({
-    table_name: 'profiles',
-    record_id: userId,
-    actor,
-    action: 'DELETE',
-    old_data: existing as unknown as Record<string, unknown>,
-    new_data: null,
-  });
 }
 
 // =============================================================================
@@ -5014,36 +4579,8 @@ export function syncErpTendersAndCostsIntoStore(
   const maxSerial = nextTenders.reduce((m, t) => Math.max(m, t.serial_no || 0), 0);
   let nextSerial = maxSerial + 1;
 
-  const liveProfiles = getProfiles();
-  const primaryAdminLive =
-    liveProfiles.find(
-      (p) => p.email.trim().toLowerCase() === PRIMARY_APP_ADMIN_EMAIL.toLowerCase()
-    ) || liveProfiles.find((p) => p.role === 'app_admin' && p.active);
-  let activeActorId =
-    primaryAdminLive?.id ||
-    SEEDED_PROFILES[0]?.id ||
-    '00000000-0000-4000-8000-000000000001';
-  try {
-    const profiles = getProfiles();
-    const switchedId =
-      typeof sessionStorage !== 'undefined'
-        ? sessionStorage.getItem('pzone_admin_switch_user_id')
-        : null;
-    if (switchedId) {
-      const switched = profiles.find((p) => p.id === switchedId && p.active);
-      if (switched) activeActorId = switched.id;
-    } else if (typeof localStorage !== 'undefined') {
-      const sessionEmail = localStorage.getItem('pzone_session_email');
-      if (sessionEmail) {
-        const matched = authorizeGoogleUser(sessionEmail);
-        if (matched.allowed && matched.profile) {
-          activeActorId = matched.profile.id;
-        }
-      }
-    }
-  } catch {
-    // ignore storage errors
-  }
+  const activeSessionUser = getCurrentSessionUser();
+  const activeActorId: string | null = activeSessionUser?.id || null;
 
   for (const item of items) {
     const cleanCode = (item.proposalCode || '').trim();

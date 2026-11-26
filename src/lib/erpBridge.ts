@@ -4,13 +4,13 @@
 // Intelligent Tendering Engineering & BOQ Engine.
 // =============================================================================
 
-import { supabase as erpSupabase } from './supabase';
+import { supabase } from './supabaseClient';
 import { resolveCategoryName } from './staticLookup';
 import {
-  authorizeGoogleUser,
   dispatchNotification,
   getAssignmentsByTender,
   getComponentsByTender,
+  getCurrentSessionUser,
   getProfiles,
   getTenders,
   recordAuditEntry,
@@ -18,7 +18,6 @@ import {
   type ActorContext,
   type ErpSyncedTenderCostPayload,
 } from './dataStore';
-import { PRIMARY_APP_ADMIN_PROFILE } from './supabaseClient';
 import {
   canAccessCommercialOverheads,
   canEditModule,
@@ -41,7 +40,7 @@ export { formatDateTimeCairo, nowCairoIso, todayCairoIso };
  */
 export function buildErpAuditFields(isUpdate = false): Record<string, string> {
   const actor = resolveCurrentErpActor();
-  const actorLabel = actor.full_name || PRIMARY_APP_ADMIN_PROFILE.full_name;
+  const actorLabel = actor.full_name;
   const cairoNow = nowCairoIso();
   if (isUpdate) {
     return {
@@ -176,7 +175,7 @@ async function fetchAllErpBreakdownItems(): Promise<Record<string, unknown>[]> {
   let from = 0;
   const step = 1000;
   while (true) {
-    const { data, error } = await erpSupabase
+    const { data, error } = await supabase
       .from('proposal_breakdown_items')
       .select('*')
       .range(from, from + step - 1);
@@ -224,7 +223,7 @@ export async function startIntelligentTender(
     // 1. Check if tender already exists in ERP `tender_log` using safe parameterized filters
     let matchedErpTender: Record<string, unknown> | null = null;
     if (SAFE_UUID_REGEX.test(String(tender.id || ''))) {
-      const { data: byId } = await erpSupabase
+      const { data: byId } = await supabase
         .from('tender_log')
         .select('*')
         .eq('id', tender.id)
@@ -234,7 +233,7 @@ export async function startIntelligentTender(
       }
     }
     if (!matchedErpTender && cleanCode) {
-      const { data: byCode } = await erpSupabase
+      const { data: byCode } = await supabase
         .from('tender_log')
         .select('*')
         .ilike('proposal_number', cleanCode)
@@ -269,7 +268,7 @@ export async function startIntelligentTender(
         ...auditInsert,
       };
 
-      const { data: insertedTender, error: insertErr } = await erpSupabase
+      const { data: insertedTender, error: insertErr } = await supabase
         .from('tender_log')
         .insert(payload)
         .select()
@@ -341,13 +340,13 @@ export async function startIntelligentTender(
       }
 
       if (phasesToInsert.length > 0) {
-        await erpSupabase.from('phases').insert(phasesToInsert);
+        await supabase.from('phases').insert(phasesToInsert);
       }
     }
 
     // 3. Check if Water Feature / Pump Room geometry already exists for this tender
     if (SAFE_UUID_REGEX.test(erpTenderId)) {
-      const { data: wfData } = await erpSupabase
+      const { data: wfData } = await supabase
         .from('proposal_data_entry')
         .select('id')
         .eq('tender_log_id', erpTenderId)
@@ -445,19 +444,19 @@ export async function syncAllErpTendersAndCostsToTenderLog(): Promise<{
       { data: prFinEntries },
       boqItems,
     ] = await Promise.all([
-      erpSupabase.from('tender_log').select('*').order('created_at', { ascending: false }),
-      erpSupabase.from('phases').select('*'),
-      erpSupabase.from('clients').select('*'),
-      erpSupabase
+      supabase.from('tender_log').select('*').order('created_at', { ascending: false }),
+      supabase.from('phases').select('*'),
+      supabase.from('clients').select('*'),
+      supabase
         .from('proposal_data_entry')
         .select('id, phase_id, linked_phase, project_title, proposal_id, tender_log_id, water_feature_area_m2, water_feature_volume_m3'),
-      erpSupabase
+      supabase
         .from('pump_room_data_entry')
         .select('id, phase_id, linked_phase, project_title, proposal_id, tender_log_id'),
-      erpSupabase
+      supabase
         .from('proposal_finishes_water_feature')
         .select('id, phase_id, linked_phase, project_title, proposal_id'),
-      erpSupabase
+      supabase
         .from('proposal_finishes_pump_room')
         .select('id, phase_id, linked_phase, project_title, proposal_id'),
       fetchAllErpBreakdownItems(),
@@ -714,46 +713,21 @@ export function getCommercialBidSnapshotForTender(
 }
 
 /**
- * Resolves the currently active signed-in (or Admin-switched) user profile for ERP Audit Logs.
+ * Resolves the currently active signed-in user profile from context for ERP Audit Logs.
  */
 export function resolveCurrentErpActor(): ActorContext {
-  try {
-    if (localStorage.getItem('pzone_signed_out') === 'true') {
-      return {
-        id: PRIMARY_APP_ADMIN_PROFILE.id,
-        full_name: 'Unauthenticated Session',
-        role: 'viewer',
-      };
-    }
-    const profiles = getProfiles();
-    const switchedId = sessionStorage.getItem('pzone_admin_switch_user_id');
-    if (switchedId) {
-      const switched = profiles.find((p) => p.id === switchedId && p.active);
-      if (switched) {
-        return { id: switched.id, full_name: switched.full_name, role: switched.role };
-      }
-    }
-    const email = localStorage.getItem('pzone_session_email');
-    if (email) {
-      const check = authorizeGoogleUser(email);
-      if (check.allowed && check.profile) {
-        return {
-          id: check.profile.id,
-          full_name: check.profile.full_name,
-          role: check.profile.role,
-        };
-      }
-    }
-  } catch {
-    // ignore
+  const current = getCurrentSessionUser();
+  if (current) {
+    return {
+      id: current.id,
+      full_name: current.full_name,
+      role: current.role,
+    };
   }
-  const fallbackAdmin =
-    getProfiles().find((p) => p.role === 'app_admin' && p.active) ||
-    PRIMARY_APP_ADMIN_PROFILE;
   return {
-    id: fallbackAdmin.id,
-    full_name: fallbackAdmin.full_name,
-    role: fallbackAdmin.role,
+    id: '',
+    full_name: '',
+    role: 'viewer',
   };
 }
 
