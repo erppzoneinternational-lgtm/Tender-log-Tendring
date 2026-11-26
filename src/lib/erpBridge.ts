@@ -549,7 +549,7 @@ export async function syncAllErpTendersAndCostsToTenderLog(): Promise<{
       const directTotal = civilDirect + mechDirect + elecDirect;
 
       // Check if CommercialBidPricePortal saved an exact custom bid snapshot for this tender
-      const savedSnapshot = getCommercialBidSnapshotForTender(pId);
+      const savedSnapshot = getCommercialBidSnapshotForTender(pId, erpTenders);
       let civilSelling = 0;
       let mechSelling = 0;
       let elecSelling = 0;
@@ -681,32 +681,41 @@ export interface CommercialBidSnapshot {
   updatedAt: string;
 }
 
-const COMMERCIAL_SNAPSHOTS_KEY = 'pzone_commercial_saved_bids_v1';
-
-export function saveCommercialBidSnapshotForTender(
-  erpTenderId: string,
-  snapshot: CommercialBidSnapshot
-): void {
-  if (!erpTenderId) return;
-  try {
-    const raw = localStorage.getItem(COMMERCIAL_SNAPSHOTS_KEY);
-    const map = raw ? (JSON.parse(raw) as Record<string, CommercialBidSnapshot>) : {};
-    map[String(erpTenderId)] = snapshot;
-    localStorage.setItem(COMMERCIAL_SNAPSHOTS_KEY, JSON.stringify(map));
-  } catch {
-    // ignore storage errors
-  }
+export interface CommercialConfig {
+  version: 1;
+  inputs: Record<string, unknown>;
+  snapshot: CommercialBidSnapshot;
+  saved_at: string;
+  saved_by: { id: string; full_name: string };
 }
 
 export function getCommercialBidSnapshotForTender(
-  erpTenderId: string
+  erpTenderId: string,
+  erpTenderRows?: ReadonlyArray<Record<string, unknown>> | Record<string, unknown> | null
 ): CommercialBidSnapshot | null {
   if (!erpTenderId) return null;
+  const targetId = String(erpTenderId);
+
+  const matchedRow = Array.isArray(erpTenderRows)
+    ? erpTenderRows.find((r) => String(r?.id) === targetId) ?? null
+    : erpTenderRows && String(erpTenderRows.id) === targetId
+      ? erpTenderRows
+      : null;
+
+  const rawConfig = matchedRow?.commercial_config as CommercialConfig | null | undefined;
+  if (rawConfig && typeof rawConfig === 'object') {
+    if (rawConfig.snapshot && typeof rawConfig.snapshot === 'object') {
+      return rawConfig.snapshot;
+    }
+    return null;
+  }
+
+  // One-time fallback when commercial_config is null on the tender_log row
   try {
-    const raw = localStorage.getItem(COMMERCIAL_SNAPSHOTS_KEY);
+    const raw = localStorage.getItem('pzone_commercial_saved_bids_v1');
     if (!raw) return null;
     const map = JSON.parse(raw) as Record<string, CommercialBidSnapshot>;
-    return map[String(erpTenderId)] || null;
+    return map[targetId] || null;
   } catch {
     return null;
   }
