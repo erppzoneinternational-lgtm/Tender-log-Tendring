@@ -120,8 +120,52 @@ function sanitizeRowForSupabase(
 let isHydrating = false;
 let inFlightSyncCount = 0;
 let syncQueuePromise: Promise<void> = Promise.resolve();
+let activeWritePromise: Promise<void> | null = null;
+let syncStopped = false;
 let realtimeChannel: RealtimeChannel | null = null;
 let hydrateTimer: ReturnType<typeof setTimeout> | null = null;
+
+export function resumeSupabaseSync(): void {
+  syncStopped = false;
+}
+
+/**
+ * Stops Supabase Realtime channels, cancels any pending sync timers/queued writes,
+ * blocks new writes from starting, and waits up to `maxWaitMs` for an in-flight
+ * sync write to settle.
+ */
+export async function stopAndDrainSupabaseSync(maxWaitMs = 3000): Promise<void> {
+  syncStopped = true;
+  if (hydrateTimer) {
+    clearTimeout(hydrateTimer);
+    hydrateTimer = null;
+  }
+  realtimeChannel = null;
+  knownRemoteProfileIds.clear();
+
+  const timeoutPromise = new Promise<void>((resolve) => {
+    setTimeout(resolve, maxWaitMs);
+  });
+
+  const drainPromise = (async () => {
+    if (isSupabaseConfigured) {
+      try {
+        await supabase.removeAllChannels();
+      } catch {
+        // ignore channel removal errors
+      }
+    }
+    if (activeWritePromise) {
+      try {
+        await activeWritePromise;
+      } catch {
+        // ignore in-flight sync errors
+      }
+    }
+  })();
+
+  await Promise.race([drainPromise, timeoutPromise]);
+}
 
 function emitCloudSyncError(table: SyncTableKey, message: string): void {
   console.error(`[Supabase Sync] Cloud save error on ${table}:`, message);
@@ -157,7 +201,9 @@ export function syncArrayDiffToSupabase(
   prevRows: Record<string, unknown>[],
   nextRows: Record<string, unknown>[]
 ): Promise<void> {
-  if (!isSupabaseConfigured || isHydrating || table === 'profiles') return Promise.resolve();
+  if (!isSupabaseConfigured || isHydrating || syncStopped || table === 'profiles') {
+    return Promise.resolve();
+  }
 
   const prevMap = new Map<string, Record<string, unknown>>();
   for (const r of prevRows) {
@@ -197,116 +243,132 @@ export function syncArrayDiffToSupabase(
 
   inFlightSyncCount += 1;
   const runStep = async () => {
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session?.user) {
-        return;
-      }
+    if (syncStopped) {
+      inFlightSyncCount = Math.max(0, inFlightSyncCount - 1);
+      return;
+    }
 
-      if (deletedIds.length > 0) {
-        const { error: delErr } = await supabase
-          .from(table)
-          .delete()
-          .in('id', deletedIds);
-        if (delErr) {
-          emitCloudSyncError(table, delErr.message);
-        }
-      }
-
-      if (toUpsert.length > 0) {
-        if (table === 'audit_log') {
-          const newEntries = toUpsert.filter((e) => !e.id || !prevMap.has(String(e.id)));
-          if (newEntries.length > 0) {
-            const { error: insErr } = await supabase.from(table).insert(newEntries);
-            if (insErr) {
-              console.warn(`[Supabase Sync] Audit insert warning:`, insErr.message);
-            }
-          }
+    const stepPromise = (async () => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (!session?.user || syncStopped) {
           return;
         }
 
-        const rowsWithoutId = toUpsert.filter((r) => !r.id);
-        const rowsWithId = toUpsert.filter((r) => Boolean(r.id));
-
-        if (rowsWithoutId.length > 0) {
-          const noIdConflict =
-            table === 'lookup_values'
-              ? 'category,code'
-              : table === 'exchange_rates'
-                ? 'currency,rate_date'
-                : undefined;
-          const { error: noIdErr } = noIdConflict
-            ? await supabase
-                .from(table)
-                .upsert(rowsWithoutId, { onConflict: noIdConflict })
-            : await supabase.from(table).insert(rowsWithoutId);
-          if (noIdErr) {
-            emitCloudSyncError(table, noIdErr.message);
+        if (deletedIds.length > 0) {
+          const { error: delErr } = await supabase
+            .from(table)
+            .delete()
+            .in('id', deletedIds);
+          if (delErr) {
+            emitCloudSyncError(table, delErr.message);
           }
         }
 
-        if (rowsWithId.length === 0) {
-          return;
-        }
-
-        const { error: upsErr } = await supabase
-          .from(table)
-          .upsert(rowsWithId, { onConflict: 'id' });
-        if (upsErr) {
-          if (
-            table === 'tasks' &&
-            upsErr.message?.toLowerCase().includes('tasks_tender_id_key')
-          ) {
-            for (const tRow of rowsWithId) {
-              if (!tRow.tender_id) continue;
-              const patchTask = { ...tRow };
-              delete patchTask.id;
-              await supabase.from('tasks').update(patchTask).eq('tender_id', tRow.tender_id);
-            }
-          } else if (
-            table === 'tenders' &&
-            upsErr.code === '23503' &&
-            !upsErr.message?.toLowerCase().includes('audit_log')
-          ) {
-            const fallbackTenders = rowsWithId.map((tRow) => ({
-              ...tRow,
-              sales_representative_id: null,
-              created_by: null,
-              updated_by: null,
-            }));
-            const retryRes = await supabase
-              .from('tenders')
-              .upsert(fallbackTenders, { onConflict: 'id' });
-            if (retryRes.error) {
-              emitCloudSyncError(table, retryRes.error.message);
-            }
-          } else if (table === 'notifications') {
-            for (const nRow of rowsWithId) {
-              if (!isValidUuid(nRow.user_id)) continue;
-              const singleRes = await supabase
-                .from('notifications')
-                .upsert([nRow], { onConflict: 'id' });
-              if (
-                singleRes.error &&
-                singleRes.error.code === '23503' &&
-                singleRes.error.message?.toLowerCase().includes('tender_id')
-              ) {
-                await supabase
-                  .from('notifications')
-                  .upsert([{ ...nRow, tender_id: null }], { onConflict: 'id' });
+        if (toUpsert.length > 0) {
+          if (table === 'audit_log') {
+            const newEntries = toUpsert.filter((e) => !e.id || !prevMap.has(String(e.id)));
+            if (newEntries.length > 0) {
+              const { error: insErr } = await supabase.from(table).insert(newEntries);
+              if (insErr) {
+                console.warn(`[Supabase Sync] Audit insert warning:`, insErr.message);
               }
             }
-          } else {
-            emitCloudSyncError(table, upsErr.message);
+            return;
+          }
+
+          const rowsWithoutId = toUpsert.filter((r) => !r.id);
+          const rowsWithId = toUpsert.filter((r) => Boolean(r.id));
+
+          if (rowsWithoutId.length > 0) {
+            const noIdConflict =
+              table === 'lookup_values'
+                ? 'category,code'
+                : table === 'exchange_rates'
+                  ? 'currency,rate_date'
+                  : undefined;
+            const { error: noIdErr } = noIdConflict
+              ? await supabase
+                  .from(table)
+                  .upsert(rowsWithoutId, { onConflict: noIdConflict })
+              : await supabase.from(table).insert(rowsWithoutId);
+            if (noIdErr) {
+              emitCloudSyncError(table, noIdErr.message);
+            }
+          }
+
+          if (rowsWithId.length === 0) {
+            return;
+          }
+
+          const { error: upsErr } = await supabase
+            .from(table)
+            .upsert(rowsWithId, { onConflict: 'id' });
+          if (upsErr) {
+            if (
+              table === 'tasks' &&
+              upsErr.message?.toLowerCase().includes('tasks_tender_id_key')
+            ) {
+              for (const tRow of rowsWithId) {
+                if (!tRow.tender_id) continue;
+                const patchTask = { ...tRow };
+                delete patchTask.id;
+                await supabase.from('tasks').update(patchTask).eq('tender_id', tRow.tender_id);
+              }
+            } else if (
+              table === 'tenders' &&
+              upsErr.code === '23503' &&
+              !upsErr.message?.toLowerCase().includes('audit_log')
+            ) {
+              const fallbackTenders = rowsWithId.map((tRow) => ({
+                ...tRow,
+                sales_representative_id: null,
+                created_by: null,
+                updated_by: null,
+              }));
+              const retryRes = await supabase
+                .from('tenders')
+                .upsert(fallbackTenders, { onConflict: 'id' });
+              if (retryRes.error) {
+                emitCloudSyncError(table, retryRes.error.message);
+              }
+            } else if (table === 'notifications') {
+              for (const nRow of rowsWithId) {
+                if (!isValidUuid(nRow.user_id)) continue;
+                const singleRes = await supabase
+                  .from('notifications')
+                  .upsert([nRow], { onConflict: 'id' });
+                if (
+                  singleRes.error &&
+                  singleRes.error.code === '23503' &&
+                  singleRes.error.message?.toLowerCase().includes('tender_id')
+                ) {
+                  await supabase
+                    .from('notifications')
+                    .upsert([{ ...nRow, tender_id: null }], { onConflict: 'id' });
+                }
+              }
+            } else {
+              emitCloudSyncError(table, upsErr.message);
+            }
           }
         }
+      } catch (err) {
+        console.warn(`[Supabase Sync] Unexpected error syncing ${table}:`, err);
+      } finally {
+        inFlightSyncCount = Math.max(0, inFlightSyncCount - 1);
       }
-    } catch (err) {
-      console.warn(`[Supabase Sync] Unexpected error syncing ${table}:`, err);
+    })();
+
+    activeWritePromise = stepPromise;
+    try {
+      await stepPromise;
     } finally {
-      inFlightSyncCount = Math.max(0, inFlightSyncCount - 1);
+      if (activeWritePromise === stepPromise) {
+        activeWritePromise = null;
+      }
     }
   };
 
@@ -327,18 +389,19 @@ export async function hydrateWorkspaceFromSupabase(
   callbacks: SupabaseHydrationCallbacks,
   onlyTables?: SyncTableKey[]
 ): Promise<void> {
-  if (!isSupabaseConfigured) return;
+  if (!isSupabaseConfigured || syncStopped) return;
 
   // Wait for any queued/in-flight writes to commit before reading back from cloud
   if (inFlightSyncCount > 0) {
     await syncQueuePromise;
   }
+  if (syncStopped) return;
 
   // Never hydrate when unauthenticated — RLS returns empty `[]` for `anon` which would wipe local state
   const {
     data: { session },
   } = await supabase.auth.getSession();
-  if (!session?.user) {
+  if (!session?.user || syncStopped) {
     return;
   }
 
@@ -347,7 +410,7 @@ export async function hydrateWorkspaceFromSupabase(
     .from('profiles')
     .select('id')
     .limit(1);
-  if (probeErr || !Array.isArray(rlsProbe) || rlsProbe.length === 0) {
+  if (syncStopped || probeErr || !Array.isArray(rlsProbe) || rlsProbe.length === 0) {
     return;
   }
 
@@ -372,7 +435,7 @@ export async function hydrateWorkspaceFromSupabase(
       tables.map(async (table) => {
         const query = supabase.from(table).select('*');
         const { data, error } = await query;
-        if (!error && Array.isArray(data)) {
+        if (!syncStopped && !error && Array.isArray(data)) {
           if (table === 'profiles' && data.length > 0) {
             knownRemoteProfileIds.clear();
             for (const p of data) {
@@ -395,7 +458,9 @@ export async function hydrateWorkspaceFromSupabase(
         }
       })
     );
-    callbacks.notifyComplete();
+    if (!syncStopped) {
+      callbacks.notifyComplete();
+    }
   } catch (err) {
     console.warn('[Supabase Sync] Hydration warning:', err);
   } finally {

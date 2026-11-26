@@ -75,7 +75,9 @@ import {
 import {
   generateUuid,
   hydrateWorkspaceFromSupabase,
+  resumeSupabaseSync,
   startSupabaseRealtimeSubscription,
+  stopAndDrainSupabaseSync,
   syncArrayDiffToSupabase,
   type SyncTableKey,
 } from '@/lib/supabaseSync';
@@ -135,7 +137,7 @@ if (typeof window !== 'undefined') {
       const keysToRemove: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (k && k.startsWith('pzone_')) {
+        if (k && k.startsWith('pzone_') && k !== 'pzone_commercial_saved_bids_v1') {
           keysToRemove.push(k);
         }
       }
@@ -175,6 +177,82 @@ function notifyListeners(): void {
 }
 
 const memoryCache = new Map<string, unknown>();
+let isLocalDataCleared = false;
+const liveSyncCleanupFns = new Set<() => void>();
+
+export function registerLiveSyncCleanup(fn: () => void): () => void {
+  liveSyncCleanupFns.add(fn);
+  return () => {
+    liveSyncCleanupFns.delete(fn);
+  };
+}
+
+const PRESERVED_PZONE_LOCAL_KEYS: ReadonlySet<string> = new Set([
+  'pzone_theme',
+  'pzone_lang',
+  'pzone_commercial_saved_bids_v1',
+]);
+
+/**
+ * Stops all live work (Realtime channels, 15s sync timer, pending sync queue),
+ * waits up to 3s for any in-flight sync write, removes all `pzone_*` keys from
+ * localStorage (except display preferences and the Fix 9b read-only fallback)
+ * and sessionStorage, and resets the in-memory store.
+ */
+export async function clearTenderLocalData(): Promise<void> {
+  // 1. Stop live sync timers/listeners and drain any in-flight Supabase write (max 3s)
+  for (const cleanup of Array.from(liveSyncCleanupFns)) {
+    try {
+      cleanup();
+    } catch {
+      // ignore cleanup errors
+    }
+  }
+  liveSyncCleanupFns.clear();
+  await stopAndDrainSupabaseSync(3000);
+
+  // 2. Lock out any subsequent local or remote writes until a fresh session starts
+  isLocalDataCleared = true;
+  currentSessionUser = null;
+
+  // 3. Remove `pzone_*` keys from localStorage except preserved display/fallback keys
+  if (typeof window !== 'undefined') {
+    try {
+      const localKeysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('pzone_') && !PRESERVED_PZONE_LOCAL_KEYS.has(k)) {
+          localKeysToRemove.push(k);
+        }
+      }
+      for (const k of localKeysToRemove) {
+        localStorage.removeItem(k);
+      }
+    } catch {
+      // ignore localStorage errors
+    }
+
+    // 4. Remove every `pzone_*` key from sessionStorage
+    try {
+      const sessionKeysToRemove: string[] = [];
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const k = sessionStorage.key(i);
+        if (k && k.startsWith('pzone_')) {
+          sessionKeysToRemove.push(k);
+        }
+      }
+      for (const k of sessionKeysToRemove) {
+        sessionStorage.removeItem(k);
+      }
+    } catch {
+      // ignore sessionStorage errors
+    }
+  }
+
+  // 5. Reset in-memory store and notify listeners so current UI clears immediately
+  memoryCache.clear();
+  notifyListeners();
+}
 
 if (
   typeof window !== 'undefined' &&
@@ -194,6 +272,9 @@ if (
 }
 
 function readStorage<T>(key: string, fallback: T): T {
+  if (isLocalDataCleared) {
+    return (Array.isArray(fallback) ? [] : {}) as T;
+  }
   if (memoryCache.has(key)) {
     return memoryCache.get(key) as T;
   }
@@ -220,6 +301,7 @@ function readStorage<T>(key: string, fallback: T): T {
  * WITHOUT calling `notifyListeners()`, so read getters remain safe during React render.
  */
 function persistCacheOnly<T>(key: string, data: T): void {
+  if (isLocalDataCleared) return;
   memoryCache.set(key, data);
   try {
     localStorage.setItem(key, JSON.stringify(data));
@@ -229,6 +311,7 @@ function persistCacheOnly<T>(key: string, data: T): void {
 }
 
 function writeStorage<T>(key: string, data: T): void {
+  if (isLocalDataCleared) return;
   const syncTable = STORAGE_KEY_TO_SUPABASE_TABLE[key];
   const prevRows =
     syncTable && Array.isArray(data)
@@ -466,6 +549,10 @@ let currentSessionUser: Profile | null = null;
 
 export function setCurrentSessionUser(profile: Profile | null): void {
   currentSessionUser = profile;
+  if (profile) {
+    isLocalDataCleared = false;
+    resumeSupabaseSync();
+  }
 }
 
 export function getCurrentSessionUser(): Profile | null {
@@ -673,6 +760,7 @@ const REMOVED_MERGED_WATER_FEATURE_CODES = new Set([
 ]);
 
 export function getLookupValues(): LookupValue[] {
+  if (isLocalDataCleared) return [];
   const raw = readStorage<LookupValue[]>(STORAGE_KEYS.LOOKUPS, DEFAULT_LOOKUP_VALUES);
   let migrated = false;
 
