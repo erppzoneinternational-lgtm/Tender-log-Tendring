@@ -449,16 +449,16 @@ export async function syncAllErpTendersAndCostsToTenderLog(): Promise<{
       supabase.from('clients').select('*'),
       supabase
         .from('proposal_data_entry')
-        .select('id, phase_id, linked_phase, project_title, proposal_id, tender_log_id, water_feature_area_m2, water_feature_volume_m3'),
+        .select('id, phase_id, tender_log_id, water_feature_area_m2, water_feature_volume_m3'),
       supabase
         .from('pump_room_data_entry')
-        .select('id, phase_id, linked_phase, project_title, proposal_id, tender_log_id'),
+        .select('id, linked_phase, tender_log_id'),
       supabase
         .from('proposal_finishes_water_feature')
-        .select('id, phase_id, linked_phase, project_title, proposal_id'),
+        .select('id, linked_phase, linked_proposal'),
       supabase
         .from('proposal_finishes_pump_room')
-        .select('id, phase_id, linked_phase, project_title, proposal_id'),
+        .select('id, linked_phase, linked_proposal'),
       fetchAllErpBreakdownItems(),
     ]);
 
@@ -470,42 +470,67 @@ export async function syncAllErpTendersAndCostsToTenderLog(): Promise<{
     const phaseIdsSet = new Set(phasesArr.map((p) => String(p.id)));
     const phaseToProposalMap = new Map<string, string>();
     phasesArr.forEach((p) => {
-      const propId = p.tender_log_id || p.linked_proposal || p.proposal_id;
+      const propId = p.tender_log_id;
       if (p.id && propId) phaseToProposalMap.set(String(p.id), String(propId));
     });
 
     const recordToPhaseMap = new Map<string, string>();
     const recordToProposalMap = new Map<string, string>();
-    [
-      ...(wfEntries || []),
-      ...(prEntries || []),
-      ...(wfFinEntries || []),
-      ...(prFinEntries || []),
-    ].forEach((rec) => {
+
+    (wfEntries || []).forEach((rec) => {
       if (!rec?.id) return;
-      const pId = rec.phase_id || rec.linked_phase;
-      const propId =
-        rec.tender_log_id ||
-        rec.project_title ||
-        rec.proposal_id ||
-        (pId && phaseToProposalMap.get(String(pId)));
-      if (pId) recordToPhaseMap.set(String(rec.id), String(pId));
-      if (propId) recordToProposalMap.set(String(rec.id), String(propId));
+      const phaseId = rec.phase_id ? String(rec.phase_id) : '';
+      const propId = rec.tender_log_id
+        ? String(rec.tender_log_id)
+        : phaseId
+          ? phaseToProposalMap.get(phaseId) || ''
+          : '';
+      if (phaseId) recordToPhaseMap.set(String(rec.id), phaseId);
+      if (propId) recordToProposalMap.set(String(rec.id), propId);
+    });
+
+    (prEntries || []).forEach((rec) => {
+      if (!rec?.id) return;
+      const phaseId = rec.linked_phase ? String(rec.linked_phase) : '';
+      const propId = rec.tender_log_id
+        ? String(rec.tender_log_id)
+        : phaseId
+          ? phaseToProposalMap.get(phaseId) || ''
+          : '';
+      if (phaseId) recordToPhaseMap.set(String(rec.id), phaseId);
+      if (propId) recordToProposalMap.set(String(rec.id), propId);
+    });
+
+    [...(wfFinEntries || []), ...(prFinEntries || [])].forEach((rec) => {
+      if (!rec?.id) return;
+      const rawLinked = rec.linked_phase ? String(rec.linked_phase) : '';
+      const phaseId = rawLinked
+        ? phaseIdsSet.has(rawLinked)
+          ? rawLinked
+          : recordToPhaseMap.get(rawLinked) || ''
+        : '';
+      const propId = rec.linked_proposal
+        ? String(rec.linked_proposal)
+        : (rawLinked && recordToProposalMap.get(rawLinked)) ||
+          (phaseId && phaseToProposalMap.get(phaseId)) ||
+          '';
+      if (phaseId) recordToPhaseMap.set(String(rec.id), phaseId);
+      if (propId) recordToProposalMap.set(String(rec.id), propId);
     });
 
     const normalizedBoq = (boqItems || []).map((item) => {
       let resolvedPhaseId = item.phase_id ? String(item.phase_id) : '';
-      let resolvedProposalId = String(item.proposal_id || item.tender_log_id || '');
+      let resolvedProposalId = String(item.tender_log_id || item.proposal_id || '');
 
       if (resolvedPhaseId && !phaseIdsSet.has(resolvedPhaseId)) {
         const mappedPhase = recordToPhaseMap.get(resolvedPhaseId);
+        if (!resolvedProposalId) {
+          resolvedProposalId =
+            recordToProposalMap.get(resolvedPhaseId) ||
+            (mappedPhase ? phaseToProposalMap.get(mappedPhase) : '') ||
+            '';
+        }
         if (mappedPhase) {
-          if (!resolvedProposalId) {
-            resolvedProposalId =
-              recordToProposalMap.get(resolvedPhaseId) ||
-              phaseToProposalMap.get(mappedPhase) ||
-              '';
-          }
           resolvedPhaseId = mappedPhase;
         }
       }
@@ -524,13 +549,13 @@ export async function syncAllErpTendersAndCostsToTenderLog(): Promise<{
     const payloads: ErpSyncedTenderCostPayload[] = erpTenders.map((t) => {
       const pId = String(t.id);
       const tPhases = phasesArr.filter(
-        (p) => String(p.tender_log_id || p.linked_proposal || p.proposal_id) === pId
+        (p) => String(p.tender_log_id || '') === pId
       );
       const tPhaseIds = new Set(tPhases.map((p) => String(p.id)));
 
       const tItems = normalizedBoq.filter((item) => {
-        const matchTender = String(item.tender_log_id || item.proposal_id) === pId;
-        const matchPhase = item.phase_id && tPhaseIds.has(String(item.phase_id));
+        const matchTender = String(item.tender_log_id || item.proposal_id || '') === pId;
+        const matchPhase = Boolean(item.phase_id && tPhaseIds.has(String(item.phase_id)));
         return matchTender || matchPhase;
       });
 
@@ -595,9 +620,8 @@ export async function syncAllErpTendersAndCostsToTenderLog(): Promise<{
       // Compute total area & volume from Water Feature entries
       const tWfEntries = (wfEntries || []).filter(
         (w) =>
-          String(w.tender_log_id || w.project_title || w.proposal_id) === pId ||
-          (w.phase_id && tPhaseIds.has(String(w.phase_id))) ||
-          (w.linked_phase && tPhaseIds.has(String(w.linked_phase)))
+          String(w.tender_log_id || '') === pId ||
+          Boolean(w.phase_id && tPhaseIds.has(String(w.phase_id)))
       );
 
       let totalAreaM2 = 0;
