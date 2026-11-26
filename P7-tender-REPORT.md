@@ -951,3 +951,69 @@ $ git ls-files | grep -i "\.env"
 - `VITE_SUPABASE_PUBLISHABLE_KEY`
 - `VITE_AUTH_COOKIE_DOMAIN`
 - `VITE_PORTAL_URL`
+
+---
+
+## Fix 1
+
+### 1. Summary of Changes (`file:line`)
+1. **Fresh role vs. cached profile list (`src/contexts/AppContext.tsx:163-186`)**
+   - Updated the `"Keep user state synced when hydrated profiles updates"` effect so `role`, `module_permissions`, `can_access_commercial_overheads`, and `active` come **only** from `refresh()` (`src/contexts/AppContext.tsx:205-228`).
+   - Removed the `live.active !== true` logout/no-access branch and removed `email`, `role`, `can_access_commercial_overheads`, and `module_permissions` from the hydrated `profiles` sync effect; the effect now compares and copies only `full_name`, `full_name_ar`, `team`, `phone`, and `avatar_url` onto `{ ...user, ... }` (`src/contexts/AppContext.tsx:168-184`).
+2. **`refresh()` on a temporary error (`src/contexts/AppContext.tsx:204-231`)**
+   - Separated transient read failures (`profileErr` at `src/contexts/AppContext.tsx:211-214` and thrown network errors in `catch` at `src/contexts/AppContext.tsx:229-231`) from missing/inactive profile rows.
+   - On a temporary `profiles` read error (network / 5xx), `refresh()` now calls `setLoading(false)` and returns while preserving the current `user` and `noAccess` state.
+   - `"No access"` (`setNoAccess(true)`) is shown only when the `profiles` query succeeds without error and `!row || row.active !== true` (`src/contexts/AppContext.tsx:216-222`).
+3. **No database requests before sign-in (`src/main.jsx:1-14`)**
+   - Removed the root `<LookupProvider>` import and wrapper from `src/main.jsx:6-13`, leaving `<LookupProvider>` mounted solely inside `src/pages/ErpWorkspacePage.tsx:321-520` for `/erp/*` routes.
+4. **Existing columns & join keys in `syncAllErpTendersAndCostsToTenderLog` (`src/lib/erpBridge.ts:450-560, 621-625`)**
+   - Replaced non-existent columns in the 4 ERP entry/finishes `.select(...)` calls (`src/lib/erpBridge.ts:450-461`) and aligned the phase/proposal/area/volume roll-up joins (`src/lib/erpBridge.ts:471-560, 621-625`) with all cost, margin, area, and volume formulas left untouched.
+
+### 2. `useLookup` Screen & Component Check
+- **Screens outside `/erp/*` using `useLookup`:** **None (`0` screens)**. Every non-ERP route (`/`, `/tenders`, `/tenders/new`, `/tenders/:id`, `/board`, `/dashboard`, `/reports`, `/notifications`, `/admin/users`, `/admin/lookups`, `/admin/rates`, `/admin/audit`) reads Tender Log lookups from `dataStore.ts` (`lookup_values`) after sign-in and has zero imports of `lookupContext`, `RecordDrawer`, `TableBrowser`, `TenderPortal`, `SearchableSelect`, or `StyledSelect`.
+- **All `useLookup` consumers in `src/` (all rendered exclusively inside `ErpWorkspacePage.tsx:321-520` under `/erp/*`):**
+  - `src/components/RecordDrawer.jsx:20` -> `TableBrowser.jsx:566` -> `DatabaseWorkspace.jsx:132` -> `ErpWorkspacePage.tsx:511` (`/erp/database/*`).
+  - `src/components/TableBrowser.jsx:26` -> `DatabaseWorkspace.jsx:132` -> `ErpWorkspacePage.tsx:511` (`/erp/database/*`).
+  - `src/components/TenderPortal.jsx:34` -> `ErpWorkspacePage.tsx:504` (`/erp/proposals`).
+  - `src/components/SearchableSelect.jsx:42` (`useLookup() || {}`) -> used only by ERP forms/modals/tables (`CivilBoqTableTab.jsx`, `CreateTenderModal.jsx`, `EditTenderModal.jsx`, `PumpRoomDimensionsCard.jsx`, `PumpRoomFinishesForm.jsx`, `PumpRoomForm.jsx`, `PumpRoomStructuralForm.jsx`, `WaterFeatureDimensionsCard.jsx`, `WaterFeatureElectricalForm.jsx`, `WaterFeatureElectromechanicalPortal.jsx`, `WaterFeatureElectromechanicalSuite.jsx`, `WaterFeatureFinishesForm.jsx`, `WaterFeatureForm.jsx`, `WaterFeatureMechanicalForm.jsx`, `WaterFeatureStructuralForm.jsx`, `WfMepBoqTableTab.jsx`), all mounted under `ErpWorkspacePage.tsx:485-507` (`/erp/*`).
+  - `src/components/StyledSelect.jsx:29` -> used only by ERP forms/tables (`CivilBoqTableTab.jsx`, `PumpRoomFinishesForm.jsx`, `PumpRoomForm.jsx`, `PumpRoomStructuralForm.jsx`, `WaterFeatureFinishesForm.jsx`, `WaterFeatureForm.jsx`, `WaterFeatureStructuralForm.jsx`), all mounted under `ErpWorkspacePage.tsx:485-490` (`/erp/*`).
+
+### 3. `syncAllErpTendersAndCostsToTenderLog` Select Lists & Roll-Up Joins
+
+| Table | Old `.select(...)` list | New `.select(...)` list |
+| :--- | :--- | :--- |
+| `proposal_data_entry` (`src/lib/erpBridge.ts:451-452`) | `'id, phase_id, linked_phase, project_title, proposal_id, tender_log_id, water_feature_area_m2, water_feature_volume_m3'` | `'id, phase_id, tender_log_id, water_feature_area_m2, water_feature_volume_m3'` |
+| `pump_room_data_entry` (`src/lib/erpBridge.ts:454-455`) | `'id, phase_id, linked_phase, project_title, proposal_id, tender_log_id'` | `'id, linked_phase, tender_log_id'` |
+| `proposal_finishes_water_feature` (`src/lib/erpBridge.ts:457-458`) | `'id, phase_id, linked_phase, project_title, proposal_id'` | `'id, linked_phase, linked_proposal'` |
+| `proposal_finishes_pump_room` (`src/lib/erpBridge.ts:460-461`) | `'id, phase_id, linked_phase, project_title, proposal_id'` | `'id, linked_phase, linked_proposal'` |
+
+**What the roll-up now matches on (`src/lib/erpBridge.ts:471-560, 621-625`):**
+- **`phases` -> `tender_log` (`lines 472-475, 551-553`):** `phases.tender_log_id === tender_log.id` (`phaseToProposalMap` and per-tender `tPhaseIds`).
+- **`proposal_data_entry` (`lines 480-490`):** `phase_id -> phases.id` (`recordToPhaseMap`) and `tender_log_id -> tender_log.id` (falling back to `phaseToProposalMap.get(phase_id)` in `recordToProposalMap`).
+- **`pump_room_data_entry` (`lines 492-502`):** `linked_phase -> phases.id` (`recordToPhaseMap`) and `tender_log_id -> tender_log.id` (falling back to `phaseToProposalMap.get(linked_phase)` in `recordToProposalMap`).
+- **`proposal_finishes_water_feature` & `proposal_finishes_pump_room` (`lines 504-519`):** `linked_phase -> proposal_data_entry.id` / `pump_room_data_entry.id` (resolved to `phases.id` through `recordToPhaseMap`, or direct `phases.id` if present in `phaseIdsSet`) and `linked_proposal -> tender_log.id` (falling back to `recordToProposalMap.get(linked_phase)` or `phaseToProposalMap.get(phaseId)`).
+- **`proposal_breakdown_items` BOQ cost roll-up (`lines 521-560`):** `item.tender_log_id` (or resolved `proposal_id` via `recordToProposalMap` / `phaseToProposalMap`) `=== tender_log.id`, or `item.phase_id` (resolved via `recordToPhaseMap` when holding an entry/finishes record ID) in `tPhaseIds`.
+- **Water Feature area & volume roll-up (`lines 621-625`):** `proposal_data_entry.tender_log_id === tender_log.id` or `proposal_data_entry.phase_id` in `tPhaseIds`, summing `water_feature_area_m2` and `water_feature_volume_m3`.
+
+### 4. Build Output (`npm run build`)
+```bash
+$ npm run build
+
+> pzone-intelligent-tendering-system@1.0.0 build
+> vite build
+
+vite v6.4.3 building for production...
+transforming...
+✓ 2462 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     1.29 kB │ gzip:     0.62 kB
+dist/assets/index-BM83naN9.css    273.70 kB │ gzip:    31.50 kB
+dist/assets/index-DDnhy4dl.js   4,216.85 kB │ gzip: 1,021.88 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 6.80s
+```
