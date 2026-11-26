@@ -32,7 +32,7 @@ export const resources = {
         themeDark: 'Dark',
         themeSystem: 'System',
         switchRole: 'Active Role (Demo)',
-        signOut: 'Sign Out',
+        backToPortal: 'Back to Portal',
         readOnlyBadge: 'Read-Only Viewer',
       },
       roles: {
@@ -89,7 +89,6 @@ export const resources = {
         message:
           "You don't have access to the Tender system. Ask your administrator to give you a Tender role in the Portal.",
         backToPortal: 'Back to Portal',
-        signOut: 'Sign out',
       },
       home: {
         greetingMorning: 'Good morning',
@@ -271,7 +270,7 @@ export const resources = {
         themeDark: 'داكن',
         themeSystem: 'تلقائي',
         switchRole: 'الدور الحالي (تجريبي)',
-        signOut: 'تسجيل الخروج',
+        backToPortal: 'العودة إلى البوابة',
         readOnlyBadge: 'مشاهد للقراءة فقط',
       },
       roles: {
@@ -328,7 +327,6 @@ export const resources = {
         message:
           'ليس لديك صلاحية للوصول إلى نظام المناقصات. يرجى التواصل مع مسؤول النظام لمنحك دوراً في نظام المناقصات عبر البوابة.',
         backToPortal: 'العودة إلى البوابة',
-        signOut: 'تسجيل الخروج',
       },
       home: {
         greetingMorning: 'صباح الخير',
