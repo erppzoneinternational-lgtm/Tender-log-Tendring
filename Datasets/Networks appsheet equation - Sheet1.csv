@@ -1,0 +1,1334 @@
+UPVC Tee Ø 110mm (No.),"CEILING(
+  if(
+       [Mechanical Networks Type]=""UPVC Only"",
+       ([Total No. of (T) Networks])
+       +
+       IF(
+         ([No. of Skimmer]+[No. of Gutter Drain])>8,
+         ( ([No. of Skimmer]+[No. of Gutter Drain])/8)
+         ,
+         0
+       )
+       +
+       IF(
+         [No. of Vacuum Inlets]>8,
+         [No. of Vacuum Inlets]
+         ,
+         0
+       )
+       +
+       if(
+         ([No. of Main Drain])<8,
+         (([No. of Main Drain]/4))
+         ,
+         0
+       )
+
+      ,
+      0
+      )
+)
++
+  +
+       if(
+         and([Phase Title].[Water Feature Category]=""b040678e-1343-4def-8fc8-2d6b5850fcbf""
+           ,
+           [Water Filtration Method]=""4ec9604f-02b4-4540-8e1d-10c95b9f3652"")
+           ,
+           4
+           ,
+           0
+       )"
+UPVC Tee Ø 160mm (No.),"CEILING(
+  if(
+       [Mechanical Networks Type]=""UPVC Only"",
+      
+       IF(
+         ([No. of Skimmer]+[No. of Gutter Drain])>4,
+         ( ([No. of Skimmer]+[No. of Gutter Drain])/4)
+         ,
+         0
+       )
+      
+       +
+       if(
+         ([No. of Main Drain])>12,
+         (([No. of Main Drain]/8))
+         ,
+         0
+       )
+
+      ,
+      0
+      )
+)"
+UPVC Tee Ø 200mm (No.),"CEILING(
+  if(
+       [Mechanical Networks Type]=""UPVC Only"",
+      
+       IF(
+         ([No. of Skimmer]+[No. of Gutter Drain])>8,
+         ( ([No. of Skimmer]+[No. of Gutter Drain])/8)
+         ,
+         0
+       )
+      
+       +
+       if(
+         ([No. of Main Drain])>12,
+         (([No. of Main Drain]/8))
+         ,
+         0
+       )
+
+      ,
+      0
+      )
+)"
+UPVC Tee Ø 63mm (No.),"CEILING(
+  if(
+       [Mechanical Networks Type]=""UPVC Only"",
+      
+       IF(
+         ([No. of Skimmer]+[No. of Gutter Drain])>1,
+         ( ([No. of Skimmer]+[No. of Gutter Drain]))
+         ,
+         0
+       )
+      +
+       IF(
+         ([No. of Vacuum Inlets])<2,
+         ( ([No. of Vacuum Inlets]))
+         ,
+         0
+       )
+       +
+       if(
+         ([No. of Main Drain])<4,
+         ([No. of Main Drain])
+         ,
+         0
+       )
+      ,
+      0
+      )
+)"
+UPVC Tee Ø 75mm (No.),"CEILING(
+  if(
+       [Mechanical Networks Type]=""UPVC Only"",
+       if(
+         [Total No. of (H) Networks]>1
+         ,
+         ([Total No. of (h) Networks]*2)
+         ,
+         0
+       )
+       +
+       if(
+         ([No. of Skimmer]+[No. of Gutter Drain])>3,
+         ((([No. of Skimmer]+[No. of Gutter Drain])/3))
+         ,
+         0
+       )
+       +
+       if(
+         ([No. of Vacuum Inlets])<8,
+         ([No. of Vacuum Inlets])
+         ,
+         0
+       )
+       +
+       if(
+         ([No. of Main Drain])>8,
+         (([No. of Main Drain]/4))
+         ,
+         0
+       )
+
+      ,
+      0
+      )
+)"
+UPVC Tee Ø 90mm (No.),"CEILING(
+  if(
+       [Mechanical Networks Type]=""UPVC Only"",
+       if(
+         [Total No. of (H) Networks]>1
+         ,
+         ([Total No. of (h) Networks])
+         ,
+         0
+       )
+       +
+       if(
+         ([No. of Skimmer]+[No. of Gutter Drain])>4,
+         ((([No. of Skimmer]+[No. of Gutter Drain])/4))
+         ,
+         0
+       )
+       +
+       if(
+         ([No. of Vacuum Inlets])<8,
+         ([No. of Vacuum Inlets])
+         ,
+         0
+       )
+
+      ,
+      0
+      )
+)
+
+       +
+       if(
+         and([Phase Title].[Water Feature Category]=""b040678e-1343-4def-8fc8-2d6b5850fcbf""
+           ,
+           [Water Filtration Method]=""4ec9604f-02b4-4540-8e1d-10c95b9f3652"")
+           ,
+           2
+           ,
+           0
+       )
+       +
+        
+      Ceiling( if(
+           [Water Filtration Method]=""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+           ,
+           [No. of Water Filter]*2
+          
+           +
+           if([No. of Water Filter]>0
+             ,
+             ([No. of Water Filter])
+             ,
+             0)
+             +
+             if(
+                [No. of Water Filter]>12
+                ,
+                ([No. of Water Filter]/12)
+                ,
+                0
+             )
+           ,
+           0
+       )
+     )"
+UPVC Elbow ^ 90⁰ Degree Ø 63mm (No.),"CEILING(
+  if(
+       [Mechanical Networks Type]=""UPVC Only"",
+    
+       if(
+         ([No. of Skimmer]+[No. of Gutter Drain])>1,
+         ((([No. of Skimmer]+[No. of Gutter Drain])))
+         ,
+         0
+       )
+       
+
+      ,
+      0
+      )
+)
++
+Ceiling( 
+    
+       if(
+         and([Phase Title].[Water Feature Category]=""b040678e-1343-4def-8fc8-2d6b5850fcbf""
+           ,
+           [Water Filtration Method]=""4ec9604f-02b4-4540-8e1d-10c95b9f3652"")
+           ,
+           [No. of Water Filter]
+           ,
+           0
+       )
+  +
+  if(
+           [Water Filtration Method]=""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+           ,
+           [No. of Water Filter]
+          
+           +
+           if([No. of Water Filter]>0
+             ,
+             ([No. of Water Filter])
+             ,
+             0)
+             +
+             if(
+                [No. of Water Filter]>12
+                ,
+                ([No. of Water Filter]/12)*3
+              
+                ,
+                0
+             )
+             +
+                [No. of Water Filter]*10
+           ,
+           0
+       )
+     )"
+UPVC Elbow ^ 90⁰ Degree Ø 75mm (No.),"CEILING(
+  if(
+       [Mechanical Networks Type]=""UPVC Only"",
+    
+       if(
+         ([No. of Skimmer]+[No. of Gutter Drain])>3,
+         ((([No. of Skimmer]+[No. of Gutter Drain])/3))
+         ,
+         0
+       )
+       
+
+      ,
+      0
+      )
+)"
+UPVC Elbow ^ 90⁰ Degree Ø 90mm (No.),"CEILING(
+  if(
+       [Mechanical Networks Type]=""UPVC Only"",
+    
+       if(
+         ([No. of Skimmer]+[No. of Gutter Drain])>4,
+         ((([No. of Skimmer]+[No. of Gutter Drain])/4))
+         ,
+         0
+       )
+       
+
+      ,
+      0
+      )
+)"
+UPVC Elbow ^ 90⁰ Degree Ø 110mm (No.),"CEILING(
+  if(
+       [Mechanical Networks Type]=""UPVC Only"",
+    
+       if(
+         ([No. of Skimmer]+[No. of Gutter Drain])>8,
+         ((([No. of Skimmer]+[No. of Gutter Drain])/8))
+         ,
+         0
+       )
+       
+
+      ,
+      0
+      )
+)"
+UPVC Elbow ^ 90⁰ Degree Ø 160mm (No.),"CEILING(
+  if(
+       [Mechanical Networks Type]=""UPVC Only"",
+    
+       if(
+         ([No. of Skimmer]+[No. of Gutter Drain])>4,
+         ((([No. of Skimmer]+[No. of Gutter Drain])/4))
+         ,
+         0
+       )
+       
+
+      ,
+      0
+      )
+)"
+UPVC Elbow ^ 90⁰ Degree Ø 200mm (No.),"CEILING(
+  if(
+       [Mechanical Networks Type]=""UPVC Only"",
+    
+       if(
+         ([No. of Skimmer]+[No. of Gutter Drain])>8,
+         ((([No. of Skimmer]+[No. of Gutter Drain])/8))
+         ,
+         0
+       )
+       
+
+      ,
+      0
+      )
+)"
+HDPE Pipe Ø 63mm (m),"CEILING(
+  if(
+       [Mechanical Networks Type]=""HDPE & UPVC"",
+       ([Total No. of (H) Networks]*2)*5
+       +
+       IFS(
+         ([No. of Skimmer]+[No. of Gutter Drain])>3,
+         ( ([No. of Skimmer]+[No. of Gutter Drain])*2)
+         +
+         (( ([No. of Skimmer]+[No. of Gutter Drain])/3)*7)
+         ,
+         ([No. of Skimmer]+[No. of Gutter Drain])<=3,
+         ( ([No. of Skimmer]+[No. of Gutter Drain])*7)
+         ,
+         ([No. of Skimmer]+[No. of Gutter Drain])=0,
+         0
+       )
+       +
+       IFS(
+         [No. of Vacuum Inlets]<2,
+         [Phase Title].[Water Feature Perimeter (m)]
+         ,
+         [No. of Vacuum Inlets]>=2,
+         [No. of Vacuum Inlets]*15
+         ,
+         [No. of Vacuum Inlets]=0,
+         0
+       )
+       +
+       if(
+         ([No. of Main Drain])<4,
+         (([No. of Main Drain])*15)
+         ,
+         0
+       )
+
+      ,
+      0
+      )
+)"
+HDPE Pipe Ø 75mm (m),"CEILING(
+  if(
+       [Mechanical Networks Type]=""HDPE & UPVC"",
+       ([Total No. of (H) Networks]*2)*3
+       +
+       IF(
+         ([No. of Skimmer]+[No. of Gutter Drain])>3,        
+         (( ([No. of Skimmer]+[No. of Gutter Drain])/3)*7)
+       ,
+         0
+       )
+       +
+       IF(
+         [No. of Vacuum Inlets]>2,
+         ([No. of Vacuum Inlets]/2)*15,
+         0
+       )
+       +
+       if(
+         ([No. of Main Drain])>8,
+         (([No. of Main Drain])*15)
+         ,
+         0
+       )
+
+      ,
+      0
+      )
+)"
+HDPE Pipe Ø 90mm (m),"CEILING(
+  if(
+       [Mechanical Networks Type]=""HDPE & UPVC"",
+       ([Total No. of (H) Networks]*1)*8
+       +
+       IF(
+         ([No. of Skimmer]+[No. of Gutter Drain])>3,        
+         (( ([No. of Skimmer]+[No. of Gutter Drain])/4)*7)
+       ,
+         0
+       )
+      ,
+      0
+      )
+)"
+HDPE Pipe Ø 110mm (m),"CEILING(
+  if(
+       [Mechanical Networks Type]=""HDPE & UPVC"",
+ If(
+   or([Water Filtration Method]=""bd0239e7-cf36-42a7-ba39-aa8b70d36bc3""
+     ,[Water Filtration Method]=""c63b93c2-a684-4171-adad-289c2450a748"")
+     ,
+    Ceiling(([Total No. of (T) Networks])*20)
+    +
+    CEILING(if(
+        ([No. of Skimmer]+[No. of Gutter Drain])>6
+        ,
+        (([No. of Skimmer]+[No. of Gutter Drain])/6)*30
+        ,
+        0
+    ))
+   ,
+   0
+   )
+   +
+   CEILING(
+     if(
+       [No. of Vacuum Inlets]>4
+       ,
+       [Phase Title].[Water Feature Perimeter (m)]
+       ,
+       0
+       )
+      )
+    +
+     CEILING(
+     if(
+       [No. of Main Drain]>8
+       ,
+       ([No. of Main Drain]*15)+ [Phase Title].[Water Feature Perimeter (m)]
+       ,
+       0
+       )
+      ) 
+      ,
+      0
+      )
+)"
+HDPE Pipe Ø 160mm (m),"CEILING(
+  if(
+       [Mechanical Networks Type]=""HDPE & UPVC"",
+       if(
+         [Total No. of (T) Networks]>2
+         ,
+         ([Total No. of (T) Networks]/2)+[Phase Title].[Water Feature Perimeter (m)]
+         ,
+         0
+       )
+       +
+       if(
+         ([No. of Skimmer]+[No. of Gutter Drain])>8,
+         ((([No. of Skimmer]+[No. of Gutter Drain])/8)*30)
+         +
+         [Phase Title].[Water Feature Perimeter (m)]
+         ,
+         0
+       )
+       +
+       if(
+         ([No. of Main Drain])>10,
+         (([No. of Main Drain]/4)*15)+[Phase Title].[Water Feature Perimeter (m)]
+         ,
+         0
+       )
+      ,
+      0
+      )
+)"
+HDPE Pipe Ø 200mm (m),"CEILING(
+  if(
+       [Mechanical Networks Type]=""HDPE & UPVC"",
+       if(
+         [Total No. of (T) Networks]>4
+         ,
+         ([Total No. of (T) Networks]/4)+[Phase Title].[Water Feature Perimeter (m)]
+         ,
+         0
+       )
+       +
+       if(
+         ([No. of Skimmer]+[No. of Gutter Drain])>10,
+         ((([No. of Skimmer]+[No. of Gutter Drain])/10)*30)
+         +
+         [Phase Title].[Water Feature Perimeter (m)]
+         ,
+         0
+       )
+       +
+       if(
+         ([No. of Main Drain])>12,
+         (([No. of Main Drain]/8)*15)+[Phase Title].[Water Feature Perimeter (m)]
+         ,
+         0
+       )
+
+      ,
+      0
+      )
+)"
+HDPE Reducer Ø 75/63mm (No.),"CEILING(
+  if(
+       [Mechanical Networks Type]=""HDPE & UPVC"",
+       ([Total No. of (H) Networks]*4)
+       +
+       IF(
+         ([No. of Skimmer]+[No. of Gutter Drain])>3,
+         ( ([No. of Skimmer]+[No. of Gutter Drain])/3)
+         ,
+         0
+       )
+       +
+       IF(
+         [No. of Vacuum Inlets]>2,
+         [No. of Vacuum Inlets]/2
+         ,
+         0
+       )
+       +
+       if(
+         ([No. of Main Drain])<8,
+         (([No. of Main Drain]))
+         ,
+         0
+       )
+
+      ,
+      0
+      )
+)"
+HDPE Reducer Ø 90/75mm (No.),"CEILING(
+  if(
+       [Mechanical Networks Type]=""HDPE & UPVC"",
+       ([Total No. of (H) Networks]*2)
+       +
+       IF(
+         ([No. of Skimmer]+[No. of Gutter Drain])>4,
+         ( ([No. of Skimmer]+[No. of Gutter Drain])/4)
+         ,
+         0
+       )
+      ,
+      0
+      )
+)"
+HDPE Reducer Ø 110/63mm (No.),"CEILING(
+  if(
+       [Mechanical Networks Type]=""HDPE & UPVC"",
+      
+       if(
+         [No. of Vacuum Inlets]>8,
+         [No. of Vacuum Inlets],
+         0
+       )
+      ,
+      0
+      )
+)"
+HDPE Reducer Ø 110/75mm (No.),"CEILING(
+  if(
+       [Mechanical Networks Type]=""HDPE & UPVC"",
+       if(
+         ([No. of Main Drain])<8,
+         (([No. of Main Drain]))
+         ,
+         0
+       )
+
+      ,
+      0
+      )
+)"
+HDPE Reducer Ø 110/90mm (No.),"CEILING(
+  if(
+       [Mechanical Networks Type]=""HDPE & UPVC"",       
+       if(
+         ([No. of Skimmer]+[No. of Gutter Drain])>8,
+         ((([No. of Skimmer]+[No. of Gutter Drain])/8))
+         ,
+         0
+       )
+      
+
+      ,
+      0
+      )
+)"
+HDPE Reducer Ø 110/160mm (No.),"CEILING(
+  if(
+       [Mechanical Networks Type]=""HDPE & UPVC"",
+       if(
+         [Total No. of (T) Networks]>2
+         ,
+         ([Total No. of (T) Networks]),
+         0
+       )
+       +
+       if(
+         ([No. of Skimmer]+[No. of Gutter Drain])>8,
+         ((([No. of Skimmer]+[No. of Gutter Drain])/8))
+         ,
+         0
+       )
+       +
+       if(
+         ([No. of Main Drain])>8,
+         ([No. of Main Drain]/4)
+         ,
+         0
+       )
+
+      ,
+      0
+      )
+)"
+HDPE Reducer Ø 200/160mm (m),"CEILING(
+  if(
+       [Mechanical Networks Type]=""HDPE & UPVC"",
+       if(
+         [Total No. of (T) Networks]>4
+         ,
+         ([Total No. of (T) Networks]),
+         0
+       )
+       +
+       if(
+         ([No. of Skimmer]+[No. of Gutter Drain])>16,
+         ((([No. of Skimmer]+[No. of Gutter Drain])/16))
+         ,
+         0
+       )
+       +
+       if(
+         ([No. of Main Drain])>12,
+         ([No. of Main Drain]/8)
+         ,
+         0
+       )
+
+      ,
+      0
+      )
+)"
+HDPE Elbow ^ 90⁰ Degree Ø 63mm (No.),"CEILING(
+  if(
+       [Mechanical Networks Type]=""HDPE & UPVC"",
+    
+       if(
+         ([No. of Skimmer]+[No. of Gutter Drain])>1,
+         ((([No. of Skimmer]+[No. of Gutter Drain])))
+         ,
+         0
+       )
+       
+
+      ,
+      0
+      )
+)"
+HDPE Elbow ^ 90⁰ Degree Ø 75mm (No.),"CEILING(
+  if(
+       [Mechanical Networks Type]=""HDPE & UPVC"",
+    
+       if(
+         ([No. of Skimmer]+[No. of Gutter Drain])>3,
+         ((([No. of Skimmer]+[No. of Gutter Drain])/3))
+         ,
+         0
+       )
+       
+
+      ,
+      0
+      )
+)"
+HDPE Elbow ^ 90⁰ Degree Ø 90mm (No.),"CEILING(
+  if(
+       [Mechanical Networks Type]=""HDPE & UPVC"",
+    
+       if(
+         ([No. of Skimmer]+[No. of Gutter Drain])>4,
+         ((([No. of Skimmer]+[No. of Gutter Drain])/4))
+         ,
+         0
+       )
+       
+
+      ,
+      0
+      )
+)"
+HDPE Elbow ^ 90⁰ Degree Ø 110mm (No.),"CEILING(
+  if(
+       [Mechanical Networks Type]=""HDPE & UPVC"",
+    
+       if(
+         ([No. of Skimmer]+[No. of Gutter Drain])>8,
+         ((([No. of Skimmer]+[No. of Gutter Drain])/8))
+         ,
+         0
+       )
+       
+
+      ,
+      0
+      )
+)"
+HDPE Elbow ^ 90⁰ Degree Ø 160mm (No.),"CEILING(
+  if(
+       [Mechanical Networks Type]=""HDPE & UPVC"",
+    
+       if(
+         ([No. of Skimmer]+[No. of Gutter Drain])>4,
+         ((([No. of Skimmer]+[No. of Gutter Drain])/4))
+         ,
+         0
+       )
+       
+
+      ,
+      0
+      )
+)"
+HDPE Elbow ^ 90⁰ Degree Ø 200mm (No.),"CEILING(
+  if(
+       [Mechanical Networks Type]=""HDPE & UPVC"",
+    
+       if(
+         ([No. of Skimmer]+[No. of Gutter Drain])>8,
+         ((([No. of Skimmer]+[No. of Gutter Drain])/8))
+         ,
+         0
+       )
+       
+
+      ,
+      0
+      )
+)"
+HDPE Tee Ø 63mm (No.),"CEILING(
+  if(
+       [Mechanical Networks Type]=""HDPE & UPVC"",
+      
+       IF(
+         ([No. of Skimmer]+[No. of Gutter Drain])>1,
+         ( ([No. of Skimmer]+[No. of Gutter Drain]))
+         ,
+         0
+       )
+      +
+       IF(
+         ([No. of Vacuum Inlets])<2,
+         ( ([No. of Vacuum Inlets]))
+         ,
+         0
+       )
+       +
+       if(
+         ([No. of Main Drain])<4,
+         ([No. of Main Drain])
+         ,
+         0
+       )
+      ,
+      0
+      )
+)"
+HDPE Tee Ø 75mm (No.),"CEILING(
+  if(
+       [Mechanical Networks Type]=""HDPE & UPVC"",
+       if(
+         [Total No. of (H) Networks]>1
+         ,
+         ([Total No. of (h) Networks]*2)
+         ,
+         0
+       )
+       +
+       if(
+         ([No. of Skimmer]+[No. of Gutter Drain])>3,
+         ((([No. of Skimmer]+[No. of Gutter Drain])/3))
+         ,
+         0
+       )
+       +
+       if(
+         ([No. of Vacuum Inlets])<8,
+         ([No. of Vacuum Inlets])
+         ,
+         0
+       )
+       +
+       if(
+         ([No. of Main Drain])>8,
+         (([No. of Main Drain]/4))
+         ,
+         0
+       )
+
+      ,
+      0
+      )
+)"
+HDPE Tee Ø 90mm (No.),"CEILING(
+  if(
+       [Mechanical Networks Type]=""HDPE & UPVC"",
+       if(
+         [Total No. of (H) Networks]>1
+         ,
+         ([Total No. of (h) Networks])
+         ,
+         0
+       )
+       +
+       if(
+         ([No. of Skimmer]+[No. of Gutter Drain])>4,
+         ((([No. of Skimmer]+[No. of Gutter Drain])/4))
+         ,
+         0
+       )
+       +
+       if(
+         ([No. of Vacuum Inlets])<8,
+         ([No. of Vacuum Inlets])
+         ,
+         0
+       )
+
+      ,
+      0
+      )
+)"
+HDPE Tee Ø 110mm (No.),"CEILING(
+  if(
+       [Mechanical Networks Type]=""HDPE & UPVC"",
+       ([Total No. of (T) Networks])
+       +
+       IF(
+         ([No. of Skimmer]+[No. of Gutter Drain])>8,
+         ( ([No. of Skimmer]+[No. of Gutter Drain])/8)
+         ,
+         0
+       )
+       +
+       IF(
+         [No. of Vacuum Inlets]>8,
+         [No. of Vacuum Inlets]
+         ,
+         0
+       )
+       +
+       if(
+         ([No. of Main Drain])<8,
+         (([No. of Main Drain]/4))
+         ,
+         0
+       )
+
+      ,
+      0
+      )
+)
++
+  +
+       if(
+         and([Phase Title].[Water Feature Category]=""b040678e-1343-4def-8fc8-2d6b5850fcbf""
+           ,
+           [Water Filtration Method]=""4ec9604f-02b4-4540-8e1d-10c95b9f3652"")
+           ,
+           4
+           ,
+           0
+       )"
+HDPE Tee Ø 160mm (No.),"CEILING(
+  if(
+       [Mechanical Networks Type]=""HDPE & UPVC"",
+      
+       IF(
+         ([No. of Skimmer]+[No. of Gutter Drain])>4,
+         ( ([No. of Skimmer]+[No. of Gutter Drain])/4)
+         ,
+         0
+       )
+      
+       +
+       if(
+         ([No. of Main Drain])>12,
+         (([No. of Main Drain]/8))
+         ,
+         0
+       )
+
+      ,
+      0
+      )
+)"
+HDPE Tee Ø 200mm (No.),"CEILING(
+  if(
+       [Mechanical Networks Type]=""HDPE & UPVC"",
+      
+       IF(
+         ([No. of Skimmer]+[No. of Gutter Drain])>8,
+         ( ([No. of Skimmer]+[No. of Gutter Drain])/8)
+         ,
+         0
+       )
+      
+       +
+       if(
+         ([No. of Main Drain])>12,
+         (([No. of Main Drain]/8))
+         ,
+         0
+       )
+
+      ,
+      0
+      )
+)"
+Pump Room UPVC Pipe Ø 63mm (m),"if(
+  [Water Filtration Method]<>""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  [Phase Title].[Pump Room Perimeter (m)]
+  ,
+  0
+)"
+Pump Room UPVC Pipe Ø 75mm (m),"if(
+  [Water Filtration Method]<>""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  [Phase Title].[Pump Room Perimeter (m)]
+  ,
+  0
+)"
+Pump Room UPVC Pipe Ø 90mm (m),"if(
+  [Water Filtration Method]<>""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  [Phase Title].[Pump Room Perimeter (m)]*2
+  ,
+  0
+)"
+Pump Room UPVC Pipe Ø 110mm (m),"if(
+  [Water Filtration Method]<>""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  if(
+  [Water Filtration (m³/hr)]>40,
+  [Phase Title].[Pump Room Perimeter (m)]*2
+  ,
+  0
+  )
+  ,
+  0
+)"
+Pump Room UPVC Pipe Ø 160mm (m),"if(
+  [Water Filtration Method]<>""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  if(
+  [Water Filtration (m³/hr)]>80,
+  [Phase Title].[Pump Room Perimeter (m)]*2
+  ,
+  0
+  )
+  ,
+  0
+)"
+Pump Room UPVC Pipe Ø 200mm (m),"if(
+  [Water Filtration Method]<>""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  if(
+  [Water Filtration (m³/hr)]>120,
+  [Phase Title].[Pump Room Perimeter (m)]*2
+  ,
+  0
+  )
+  ,
+  0
+)"
+Pump Room UPVC Pipe Ø 250mm (m),"if(
+  [Water Filtration Method]<>""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  if(
+  [Water Filtration (m³/hr)]>160,
+  [Phase Title].[Pump Room Perimeter (m)]*2
+  ,
+  0
+  )
+  ,
+  0
+)"
+Pump Room UPVC Pipe Ø 315mm (m),"if(
+  [Water Filtration Method]<>""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  if(
+  [Water Filtration (m³/hr)]>200,
+  [Phase Title].[Pump Room Perimeter (m)]*2
+  ,
+  0
+  )
+  ,
+  0
+)"
+Pump Room UPVC Reducer Ø 75/63mm (No.),"if(
+  [Water Filtration Method]<>""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  if(
+  [Water Filtration (m³/hr)]<40,
+  16
+  ,
+  8
+  )
+  ,
+  0
+)"
+Pump Room UPVC Reducer Ø 90/75mm (No.),"if(
+  [Water Filtration Method]<>""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  if(
+  [Water Filtration (m³/hr)]<40,
+  16
+  ,
+  8
+  )
+  ,
+  0
+)"
+Pump Room UPVC Reducer Ø 110/160mm (No.),"if(
+  [Water Filtration Method]<>""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  if(
+  [Water Filtration (m³/hr)]>80,
+  [Water Filtration (m³/hr)]/7
+  ,
+  0
+  )
+  ,
+  0
+)"
+Pump Room UPVC Reducer Ø 200/160mm (No.),"if(
+  [Water Filtration Method]<>""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  if(
+  [Water Filtration (m³/hr)]>120,
+  [Water Filtration (m³/hr)]/14
+  ,
+  0
+  )
+  ,
+  0
+)"
+Pump Room UPVC Reducer Ø 250/200mm (m),"if(
+  [Water Filtration Method]<>""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  if(
+  [Water Filtration (m³/hr)]>160,
+  [Water Filtration (m³/hr)]/28
+  ,
+  0
+  )
+  ,
+  0
+)"
+Pump Room UPVC Reducer Ø 315/250mm (m),"if(
+  [Water Filtration Method]<>""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  if(
+  [Water Filtration (m³/hr)]>200,
+  [Water Filtration (m³/hr)]/36
+  ,
+  0
+  )
+  ,
+  0
+)"
+Pump Room UPVC Tee Ø 63mm (No.),"if(
+  [Water Filtration Method]<>""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  if(
+  [Water Filtration (m³/hr)]<40,
+  16
+  ,
+  8
+  )
+  ,
+  0
+)"
+Pump Room UPVC Tee Ø 75mm (No.),"if(
+  [Water Filtration Method]<>""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  if(
+  [Water Filtration (m³/hr)]<40,
+  16
+  ,
+  8
+  )
+  ,
+  0
+)"
+Pump Room UPVC Tee Ø 90mm (No.),"if(
+  [Water Filtration Method]<>""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  if(
+  [Water Filtration (m³/hr)]>40,
+  16
+  ,
+  8
+  )
+  ,
+  0
+)"
+Pump Room UPVC Tee Ø 110mm (No.),"if(
+  [Water Filtration Method]<>""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  if(
+  [Water Filtration (m³/hr)]>80,
+  [Water Filtration (m³/hr)]/7
+  ,
+  0
+  )
+  ,
+  0
+)"
+Pump Room UPVC Tee Ø 160mm (No.),"if(
+  [Water Filtration Method]<>""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  if(
+  [Water Filtration (m³/hr)]>80,
+  [Water Filtration (m³/hr)]/7
+  ,
+  0
+  )
+  ,
+  0
+)"
+Pump Room UPVC Tee Ø 200mm (No.),"if(
+  [Water Filtration Method]<>""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  if(
+  [Water Filtration (m³/hr)]>120,
+  [Water Filtration (m³/hr)]/14
+  ,
+  0
+  )
+  ,
+  0
+)"
+Pump Room UPVC Tee Ø 250mm (No.),"if(
+  [Water Filtration Method]<>""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  if(
+  [Water Filtration (m³/hr)]>120,
+  [Water Filtration (m³/hr)]/28
+  ,
+  0
+  )
+  ,
+  0
+)"
+Pump Room UPVC Tee Ø 315mm (No.),"if(
+  [Water Filtration Method]<>""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  if(
+  [Water Filtration (m³/hr)]>200,
+  [Water Filtration (m³/hr)]/36
+  ,
+  0
+  )
+  ,
+  0
+)"
+Pump Room Ball Valve 63mm (No.),"if(
+  [Water Filtration Method]<>""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  if(
+  [Water Filtration (m³/hr)]<40,
+  8
+  ,
+  4
+  )
+  ,
+  0
+)"
+Pump Room Ball Valve Ø 75mm (No.),"if(
+  [Water Filtration Method]<>""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  if(
+  [Water Filtration (m³/hr)]<40,
+  8
+  ,
+  4
+  )
+  ,
+  0
+)"
+Pump Room Ball Valve Ø 90mm (No.),"if(
+  [Water Filtration Method]<>""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  if(
+  [Water Filtration (m³/hr)]<40,
+  8
+  ,
+  4
+  )
+  ,
+  0
+)"
+Pump Room Ball Valve Ø 110mm (No.),"if(
+  [Water Filtration Method]<>""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  if(
+  [Water Filtration (m³/hr)]>40,
+  [Water Filtration (m³/hr)]/40
+  ,
+  0
+  )
+  ,
+  0
+)"
+Pump Room Ball Valve Ø 160mm (No.),"if(
+  [Water Filtration Method]<>""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  if(
+  [Water Filtration (m³/hr)]>80,
+  [Water Filtration (m³/hr)]/80
+  ,
+  0
+  )
+  ,
+  0
+)"
+Pump Room Ball Valve Ø 200mm (No.),"if(
+  [Water Filtration Method]<>""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  if(
+  [Water Filtration (m³/hr)]>120,
+  [Water Filtration (m³/hr)]/120
+  ,
+  0
+  )
+  ,
+  0
+)"
+Pump Room Ball Valve Ø 250mm (No.),"if(
+  [Water Filtration Method]<>""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  if(
+  [Water Filtration (m³/hr)]>160,
+  [Water Filtration (m³/hr)]/160
+  ,
+  0
+  )
+  ,
+  0
+)"
+Pump Room Ball Valve Ø 315mm (No.),"if(
+  [Water Filtration Method]<>""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  if(
+  [Water Filtration (m³/hr)]>200,
+  [Water Filtration (m³/hr)]/200
+  ,
+  0
+  )
+  ,
+  0
+)"
+Ball Valve Ø 63mm (No.),"if(
+  [Water Filtration Method]=""4ec9604f-02b4-4540-8e1d-10c95b9f3652""
+  ,
+  2
+  ,
+  0
+)
++
+if(
+  and(
+    [No. of Water Filter]>12
+    ,
+  [Water Filtration Method]=""4ec9604f-02b4-4540-8e1d-10c95b9f3652"")
+  ,
+  [No. of Water Filter]/12
+  ,
+  0
+)"
+Check Valve 63 mm,"CEILING(if(
+  and(
+    [No. of Water Filter]>12
+    ,
+  [Water Filtration Method]=""4ec9604f-02b4-4540-8e1d-10c95b9f3652"")
+  ,
+  [No. of Water Filter]/12
+  ,
+  0
+)
+*
+2
+)"

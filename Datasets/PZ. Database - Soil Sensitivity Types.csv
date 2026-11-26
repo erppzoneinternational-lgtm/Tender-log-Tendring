@@ -1,0 +1,10 @@
+ID,Soil type,Probable value
+7491dd5a-f52f-4c0c-ac68-8832c514a343,Alluvium and lighter clays,5
+3f29b70a-5ffc-4443-9355-b1f3ccf7cc04,Clays (excluding alluvium),10
+7584c9b3-803f-49bb-bbd8-dbafd0926b99,Marls (e.g. Keuper marl),20
+ffab549d-5d75-4574-8798-e1ebd9c6dcdc,Porous limestone (e.g. chalk),50
+4c009e32-e8f5-43c5-91e9-744c43caaca5,Porous sandstone (e.g. Keuper sandstone and clay shales),100
+77ea42c5-8b35-4841-9e7d-8c052a2af983,"Quartzites, compact and crystalline limestone (e.g. carboniferous sediments, marble, etc.)",300
+55bca006-c39f-4292-832a-e2bd7bd651ef,Clay slates and slatey shales,"1,000.00"
+4ded3992-ccb5-478a-9be0-ed9a5c8606a7,Granite,"1,000.00"
+b3fe5ccb-9322-4571-b02e-8d74107d0d3d,"Fissile slates, schists, gneiss and igneous rocks","2,000.00"

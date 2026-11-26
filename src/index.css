@@ -1,0 +1,295 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", "IBM Plex Sans Arabic", system-ui, sans-serif;
+  --font-display: "Syne", "Plus Jakarta Sans", "IBM Plex Sans Arabic", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-arabic: "IBM Plex Sans Arabic", "Plus Jakarta Sans", system-ui, sans-serif;
+
+  --color-background: rgb(var(--bg-page));
+  --color-foreground: rgb(var(--text-primary));
+  --color-card: rgb(var(--bg-card));
+  --color-card-foreground: rgb(var(--text-primary));
+  --color-muted: rgb(var(--bg-muted));
+  --color-muted-foreground: rgb(var(--text-muted));
+  --color-border: rgb(var(--border-color));
+
+  --color-brand-50: #eefbfb;
+  --color-brand-100: #d5f5f5;
+  --color-brand-200: #afeaeb;
+  --color-brand-300: #78d9dc;
+  --color-brand-400: #3cc0c6;
+  --color-brand-500: #1E9090;
+  --color-brand-600: #197578;
+  --color-brand-700: #185e61;
+  --color-brand-800: #184b4e;
+  --color-brand-900: #183f42;
+
+  --color-pzone-navy: #26336B;
+  --color-pzone-navy-dark: #060B16;
+  --color-pzone-navy-card: #0D162B;
+  --color-pzone-teal: #1E9090;
+  --color-pzone-cyan: #00F0FF;
+  --color-pzone-seagreen: #5BA88A;
+  --color-pzone-slate: #7A9BBF;
+  --color-pzone-orange: #D4741A;
+  --color-pzone-crimson: #8B1A28;
+  --color-pzone-purple: #6A2A80;
+  --color-pzone-magenta: #D81E78;
+
+  --color-discipline-civil: #D4741A;
+  --color-discipline-mechanical: #1E9090;
+  --color-discipline-electrical: #D81E78;
+  --color-discipline-mep: #5BA88A;
+  --color-discipline-overall: #26336B;
+
+  --radius-card: 16px;
+  --shadow-soft: 0 4px 20px -2px rgba(11, 16, 32, 0.05), 0 2px 6px -1px rgba(11, 16, 32, 0.03);
+  --shadow-soft-dark: 0 4px 24px -2px rgba(0, 0, 0, 0.35);
+}
+
+@layer base {
+  :root {
+    /* Pearl-Aqua Architectural Light Mode */
+    --bg-page: 240 246 252;
+    --bg-card: 255 255 255;
+    --bg-muted: 229 238 248;
+    --text-primary: 9 15 32;
+    --text-muted: 82 98 128;
+    --border-color: 206 221 238;
+    --glow-cyan: rgba(30, 144, 144, 0.16);
+    --glow-magenta: rgba(216, 30, 120, 0.12);
+    --glass-surface: rgba(255, 255, 255, 0.78);
+    --glass-border: rgba(30, 144, 144, 0.18);
+  }
+
+  .dark {
+    /* Bioluminescent Abyssal Hydro-Luxury Dark Mode */
+    --bg-page: 5 10 21;
+    --bg-card: 12 21 40;
+    --bg-muted: 19 32 58;
+    --text-primary: 240 247 255;
+    --text-muted: 142 164 198;
+    --border-color: 30 49 82;
+    --glow-cyan: rgba(0, 240, 255, 0.16);
+    --glow-magenta: rgba(216, 30, 120, 0.15);
+    --glass-surface: rgba(12, 21, 40, 0.72);
+    --glass-border: rgba(56, 189, 248, 0.16);
+  }
+
+  html {
+    font-family: 'Plus Jakarta Sans', 'IBM Plex Sans Arabic', system-ui, sans-serif;
+  }
+
+  html[dir='rtl'] {
+    font-family: 'IBM Plex Sans Arabic', 'Plus Jakarta Sans', system-ui, sans-serif;
+  }
+
+  h1,
+  h2,
+  .font-display {
+    font-family: 'Syne', 'Plus Jakarta Sans', 'IBM Plex Sans Arabic', sans-serif;
+    letter-spacing: -0.02em;
+  }
+
+  html[dir='rtl'] h1,
+  html[dir='rtl'] h2,
+  html[dir='rtl'] .font-display {
+    font-family: 'IBM Plex Sans Arabic', 'Plus Jakarta Sans', sans-serif;
+    letter-spacing: 0;
+  }
+
+  code, pre, .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  button:not(:disabled),
+  [role='button']:not(:disabled),
+  select:not(:disabled),
+  summary {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+}
+
+/* Signature P.ZONE 4-Ribbon Animated Aurora Gradient */
+@keyframes aurora-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes float-slow {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(18px, -16px, 0) scale(1.06);
+  }
+}
+
+@keyframes pulse-ring {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.98);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scale(1.03);
+  }
+}
+
+@keyframes wave-drift {
+  0% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(-25px);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.bg-ribbon-gradient {
+  background: linear-gradient(
+    90deg,
+    #00f0ff 0%,
+    #1e9090 22%,
+    #5ba88a 45%,
+    #26336b 65%,
+    #d4741a 82%,
+    #d81e78 100%
+  );
+  background-size: 200% 200%;
+  animation: aurora-shift 8s ease infinite;
+}
+
+.border-ribbon-top {
+  position: relative;
+}
+
+.border-ribbon-top::before {
+  content: '';
+  position: absolute;
+  inset-inline: 12px;
+  top: 0;
+  height: 3px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    90deg,
+    #00f0ff 0%,
+    #1e9090 22%,
+    #5ba88a 45%,
+    #d4741a 75%,
+    #d81e78 100%
+  );
+  background-size: 200% 200%;
+  animation: aurora-shift 7s ease infinite;
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* Aquatic Kinetic Glass Surfaces */
+.hydro-glass {
+  background: var(--glass-surface);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    0 12px 36px -8px rgba(3, 8, 20, 0.35),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
+}
+
+/* Automatic Glassmorphic Elevation for All App Cards & Panels */
+.bg-card {
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  box-shadow:
+    0 10px 30px -10px rgba(2, 8, 23, 0.18),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+  transition:
+    transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.dark .bg-card {
+  background-color: rgba(12, 22, 42, 0.74) !important;
+  border-color: rgba(56, 189, 248, 0.14) !important;
+  box-shadow:
+    0 14px 36px -10px rgba(0, 0, 0, 0.55),
+    0 0 24px -8px rgba(30, 144, 144, 0.14),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.09);
+}
+
+/* Caustic Water Grid Pattern */
+.bg-hydro-grid {
+  background-image:
+    linear-gradient(to right, rgba(30, 144, 144, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(30, 144, 144, 0.06) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.dark .bg-hydro-grid {
+  background-image:
+    linear-gradient(to right, rgba(0, 240, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 240, 255, 0.045) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.animate-float-slow {
+  animation: float-slow 14s ease-in-out infinite;
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 4s ease-in-out infinite;
+}
+
+.animate-wave-drift {
+  animation: wave-drift 10s ease-in-out infinite;
+}
+
+.font-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Custom Sleek Scrollbar */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(30, 144, 144, 0.3);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 240, 255, 0.55);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

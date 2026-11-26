@@ -1,0 +1,38 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Node modules & build artifacts
+node_modules
+dist
+dist-ssr
+*.local
+
+# Environment variables & Vercel local metadata
+.env
+.env*
+!.env.example
+.vercel
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Temporary scratch scripts & local exports
+scratch/
+Datasets/*User*
+PZONE_Tendering_System_Implementation_Plan.*
+PZONE_User_Manual_Guide*.pdf
+Sample_Commercial_BOQ_Presentation*.pptx
