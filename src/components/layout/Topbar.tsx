@@ -4,8 +4,8 @@ import { useTranslation } from 'react-i18next';
 import {
   Bell,
   Globe,
+  LayoutGrid,
   Lock,
-  LogOut,
   Menu,
   Monitor,
   Moon,
@@ -13,6 +13,8 @@ import {
   Sun,
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
+import { clearTenderLocalData } from '@/lib/dataStore';
+import { PORTAL_URL } from '@/lib/supabaseClient';
 import { type ThemeMode, type UserRole } from '@/types/database';
 
 const ROLE_BADGE_STYLES: Record<UserRole, string> = {
@@ -46,8 +48,12 @@ export const Topbar: React.FC = () => {
     setMobileMenuOpen,
     setCommandPaletteOpen,
     unreadNotificationsCount,
-    signOut,
   } = useApp();
+
+  const handleBackToPortal = async () => {
+    await clearTenderLocalData();
+    window.location.assign(`${PORTAL_URL}/?stay=1`);
+  };
 
   const themeOptions: { mode: ThemeMode; icon: typeof Sun; label: string }[] = [
     { mode: 'light', icon: Sun, label: t('topbar.themeLight') },
@@ -185,11 +191,13 @@ export const Topbar: React.FC = () => {
             </div>
             <button
               type="button"
-              onClick={signOut}
-              title={t('topbar.signOut')}
-              className="p-2 rounded-xl text-muted-foreground hover:text-pzone-crimson hover:bg-pzone-crimson/10 transition-colors"
+              onClick={() => void handleBackToPortal()}
+              title={t('topbar.backToPortal')}
+              aria-label={t('topbar.backToPortal')}
+              className="inline-flex items-center gap-1.5 p-2 xl:px-3 xl:py-1.5 rounded-xl text-xs font-semibold text-muted-foreground hover:text-pzone-teal hover:bg-pzone-teal/10 transition-colors cursor-pointer"
             >
-              <LogOut className="w-4 h-4" />
+              <LayoutGrid className="w-4 h-4 shrink-0" />
+              <span className="hidden xl:inline">{t('topbar.backToPortal')}</span>
             </button>
           </div>
         )}

@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ShieldAlert } from 'lucide-react';
+import { LayoutGrid, ShieldAlert } from 'lucide-react';
 import type { AppLanguage, Profile, ThemeMode } from '@/types/database';
 import {
   isSupabaseConfigured,
@@ -9,11 +9,13 @@ import {
 } from '@/lib/supabaseClient';
 import {
   backfillRecentMissedNewTenderNotifications,
+  clearTenderLocalData,
   connectRealtimeCloudSync,
   getNotificationsForUser,
   getProfiles,
   hydrateStoreFromCloud,
   normalizeProfileRow,
+  registerLiveSyncCleanup,
   setCurrentSessionUser,
   subscribeDataStore,
 } from '@/lib/dataStore';
@@ -22,19 +24,12 @@ import {
   showDeviceNotification,
 } from '@/lib/pwaNotifications';
 
-// No login page here: the Portal owns login. This app reads the shared session cookie,
-// loads the user's own row from tender.profiles (role and module levels come from the Console), and signs out.
+// No login page here: the Portal owns login. This app reads the shared session cookie
+// and loads the user's own row from tender.profiles (role and module levels come from the Console).
 export function goToPortalLogin(): void {
   window.location.replace(
     `${PORTAL_URL}/login?redirect=${encodeURIComponent(window.location.href)}`
   );
-}
-
-export async function signOut(): Promise<void> {
-  // 'local' = this browser. The cookie is shared, so this signs out of ALL company systems.
-  setCurrentSessionUser(null);
-  await supabase.auth.signOut({ scope: 'local' });
-  window.location.replace(`${PORTAL_URL}/login`);
 }
 
 interface AppContextValue {
@@ -57,16 +52,19 @@ interface AppContextValue {
   setMobileMenuOpen: (open: boolean) => void;
   setCommandPaletteOpen: (open: boolean) => void;
   refresh: () => Promise<void>;
-  signOut: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
 
 const NoAccessScreen: React.FC<{
   resolvedDark: boolean;
-  onSignOut: () => Promise<void>;
-}> = ({ resolvedDark, onSignOut }) => {
+}> = ({ resolvedDark }) => {
   const { t } = useTranslation();
+
+  const handleBackToPortal = async () => {
+    await clearTenderLocalData();
+    window.location.assign(`${PORTAL_URL}/?stay=1`);
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background text-foreground p-6">
@@ -96,19 +94,14 @@ const NoAccessScreen: React.FC<{
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-          <a
-            href={PORTAL_URL}
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-pzone-navy hover:bg-pzone-navy/90 dark:bg-pzone-teal dark:hover:bg-pzone-teal/90 text-white text-xs font-semibold transition-colors text-center"
-          >
-            {t('noAccess.backToPortal')}
-          </a>
+        <div className="flex items-center justify-center pt-2">
           <button
             type="button"
-            onClick={() => void onSignOut()}
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-muted hover:bg-muted/80 text-foreground border border-border text-xs font-semibold transition-colors cursor-pointer"
+            onClick={() => void handleBackToPortal()}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-pzone-navy hover:bg-pzone-navy/90 dark:bg-pzone-teal dark:hover:bg-pzone-teal/90 text-white text-xs font-semibold transition-colors cursor-pointer"
           >
-            {t('noAccess.signOut')}
+            <LayoutGrid className="w-4 h-4 shrink-0" />
+            <span>{t('topbar.backToPortal')}</span>
           </button>
         </div>
       </div>
@@ -197,6 +190,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setCurrentSessionUser(null);
       setUser(null);
       setNoAccess(false);
+      await clearTenderLocalData();
       goToPortalLogin();
       return;
     }
@@ -260,7 +254,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCurrentSessionUser(null);
         setUser(null);
         setNoAccess(false);
-        goToPortalLogin();
+        void clearTenderLocalData().finally(() => {
+          goToPortalLogin();
+        });
       }
     });
 
@@ -311,12 +307,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     window.addEventListener('focus', handleVisibilityOrFocus);
     document.addEventListener('visibilitychange', handleVisibilityOrFocus);
 
-    return () => {
+    const stopLiveLoop = () => {
       active = false;
       stopRealtime();
       clearInterval(pollTimer);
       window.removeEventListener('focus', handleVisibilityOrFocus);
       document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+    };
+
+    const unregisterCleanup = registerLiveSyncCleanup(stopLiveLoop);
+
+    return () => {
+      unregisterCleanup();
+      stopLiveLoop();
     };
   }, [user?.id, noAccess]);
 
@@ -458,12 +461,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setLanguageState((prev) => (prev === 'en' ? 'ar' : 'en'));
   }, []);
 
-  const handleSignOut = useCallback(async () => {
-    setUser(null);
-    setNoAccess(false);
-    await signOut();
-  }, []);
-
   return (
     <AppContext.Provider
       value={{
@@ -486,11 +483,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setMobileMenuOpen,
         setCommandPaletteOpen,
         refresh,
-        signOut: handleSignOut,
       }}
     >
       {noAccess ? (
-        <NoAccessScreen resolvedDark={resolvedDark} onSignOut={handleSignOut} />
+        <NoAccessScreen resolvedDark={resolvedDark} />
       ) : (
         children
       )}
