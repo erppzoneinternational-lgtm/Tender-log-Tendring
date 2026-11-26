@@ -1017,3 +1017,157 @@ dist/assets/index-DDnhy4dl.js   4,216.85 kB │ gzip: 1,021.88 kB
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
 ✓ built in 6.80s
 ```
+
+---
+
+## Fix 2
+
+### 1. Summary of Changes (`file:line`)
+1. **Stop live sync & clear workspace storage (`src/lib/supabaseSync.ts:123-168, 204-206, 245-372, 382-468` & `src/lib/dataStore.ts:78-80, 140, 180-315, 550-556, 762`)**
+   - Added `stopAndDrainSupabaseSync(maxWaitMs = 3000)` and `resumeSupabaseSync()` (`src/lib/supabaseSync.ts:128-168`), which stop Realtime channels (`supabase.removeAllChannels()`), cancel pending timers and queued sync steps (`syncStopped`), block new writes after clearing, and wait up to 3 s for any in-flight sync write (`activeWritePromise`).
+   - Added `registerLiveSyncCleanup()` (`src/lib/dataStore.ts:183-188`) and exported `clearTenderLocalData()` (`src/lib/dataStore.ts:202-255`), which stops the 15 s live-sync timer and focus/visibility listeners, drains in-flight sync writes (max 3 s), locks out subsequent writes until a fresh session starts (`isLocalDataCleared`), removes every `pzone_*` key from `localStorage` (except `pzone_theme`, `pzone_lang`, `pzone_commercial_saved_bids_v1`) and `sessionStorage` without touching `sb-*` auth cookies/storage or `PORTAL_URL`, clears `memoryCache`, and notifies subscribers so the current page resets to empty arrays.
+2. **i18n label (`src/lib/i18n.ts:35, 91, 273, 329`)**
+   - Added `topbar.backToPortal` (`'Back to Portal'` in EN at `src/lib/i18n.ts:35`; `'العودة إلى البوابة'` in AR at `src/lib/i18n.ts:273`) and removed `topbar.signOut` and `noAccess.signOut`.
+3. **Top bar Back to Portal button (`src/components/layout/Topbar.tsx:7, 16-17, 42-56, 192-201`)**
+   - Replaced the `LogOut` / `signOut` button with **Back to Portal** (`LayoutGrid` icon + `t('topbar.backToPortal')`), calling `await clearTenderLocalData()` followed by `window.location.assign(\`${PORTAL_URL}/?stay=1\`)`.
+   - Checked `src/components/layout/Sidebar.tsx` (`lines 1-642`): no sign-out button exists in the desktop or mobile sidebar.
+4. **"No access" screen, session-end cleanup, and `signOut()` removal (`src/contexts/AppContext.tsx:3, 12, 18, 29-33, 59-110, 189-196, 251-261, 310-323, 464-494`)**
+   - Deleted the unused `signOut()` export, `AppContextValue.signOut`, and `handleSignOut`.
+   - Updated `NoAccessScreen` (`src/contexts/AppContext.tsx:59-110`) to remove the Sign out button and keep only **Back to Portal** (`await clearTenderLocalData()` then `window.location.assign(\`${PORTAL_URL}/?stay=1\`)`).
+   - Updated `refresh()` when no session is found (`src/contexts/AppContext.tsx:189-196`) and `onAuthStateChange` on `SIGNED_OUT` (`src/contexts/AppContext.tsx:251-261`) to call `clearTenderLocalData()` before `goToPortalLogin()`.
+   - Registered the 15 s live-sync loop cleanup via `registerLiveSyncCleanup(stopLiveLoop)` (`src/contexts/AppContext.tsx:310-323`).
+
+### 2. Storage Keys Cleared and Kept
+
+**Keys kept (untouched by `clearTenderLocalData()`):**
+- `localStorage` `pzone_theme` — user theme choice (written at `src/contexts/AppContext.tsx:421` and preserved at `src/lib/dataStore.ts:147`).
+- `localStorage` `pzone_lang` — user language choice (written at `src/contexts/AppContext.tsx:435` and preserved at `src/lib/dataStore.ts:148`).
+- `localStorage` `pzone_commercial_saved_bids_v1` — Fix 9b one-time read-only fallback (read at `src/lib/erpBridge.ts:739`; no writer).
+- Shared Supabase auth cookie and `sb-*` browser storage, `PORTAL_URL`, and any non-`pzone_` keys belonging to other apps.
+
+**Keys removed from `localStorage` (every `pzone_*` key except the 3 above):**
+| Key | Constant / Location | Writer (`file:line`) |
+| :--- | :--- | :--- |
+| `pzone_prod_v1_profiles` | `STORAGE_KEYS.PROFILES` (`src/lib/dataStore.ts:86`) | `src/lib/dataStore.ts:307` (`persistCacheOnly`) |
+| `pzone_prod_v1_lookups` | `STORAGE_KEYS.LOOKUPS` (`src/lib/dataStore.ts:87`) | `src/lib/dataStore.ts:307` (`persistCacheOnly`) |
+| `pzone_prod_v1_fx_rates` | `STORAGE_KEYS.FX_RATES` (`src/lib/dataStore.ts:88`) | `src/lib/dataStore.ts:307` (`persistCacheOnly`) |
+| `pzone_prod_v1_audit_log` | `STORAGE_KEYS.AUDIT_LOG` (`src/lib/dataStore.ts:89`) | `src/lib/dataStore.ts:307` (`persistCacheOnly`) |
+| `pzone_prod_v1_tenders` | `STORAGE_KEYS.TENDERS` (`src/lib/dataStore.ts:90`) | `src/lib/dataStore.ts:307` (`persistCacheOnly`) |
+| `pzone_prod_v1_components` | `STORAGE_KEYS.COMPONENTS` (`src/lib/dataStore.ts:91`) | `src/lib/dataStore.ts:307` (`persistCacheOnly`) |
+| `pzone_prod_v1_documents` | `STORAGE_KEYS.DOCUMENTS` (`src/lib/dataStore.ts:92`) | `src/lib/dataStore.ts:307` (`persistCacheOnly`) |
+| `pzone_prod_v1_assignments` | `STORAGE_KEYS.ASSIGNMENTS` (`src/lib/dataStore.ts:93`) | `src/lib/dataStore.ts:307` (`persistCacheOnly`) |
+| `pzone_prod_v1_tasks` | `STORAGE_KEYS.TASKS` (`src/lib/dataStore.ts:94`) | `src/lib/dataStore.ts:307` (`persistCacheOnly`) |
+| `pzone_prod_v1_comments` | `STORAGE_KEYS.COMMENTS` (`src/lib/dataStore.ts:95`) | `src/lib/dataStore.ts:307` (`persistCacheOnly`) |
+| `pzone_prod_v1_notifications` | `STORAGE_KEYS.NOTIFICATIONS` (`src/lib/dataStore.ts:96`) | `src/lib/dataStore.ts:307` (`persistCacheOnly`) |
+| `pzone_prod_v1_notif_prefs` | `STORAGE_KEYS.NOTIF_PREFS` (`src/lib/dataStore.ts:97`) | `src/lib/dataStore.ts:307` (`persistCacheOnly`) |
+| `pzone_prod_v1_saved_views` | `STORAGE_KEYS.SAVED_VIEWS` (`src/lib/dataStore.ts:98`) | `src/lib/dataStore.ts:307` (`persistCacheOnly`) |
+| `pzone_prod_clean_slate_v2_empty` | `CLEAN_SLATE_MARKER` (`src/lib/dataStore.ts:131`) | `src/lib/dataStore.ts:149` |
+| `pzone_audit_cleared_before_v1` | `AUDIT_CLEARED_STORAGE_KEY` (`src/lib/dataStore.ts:460`) | `src/lib/dataStore.ts:505` |
+| `pzone_active_erp_tender_v1` | `ACTIVE_ERP_TENDER_KEY` (`src/lib/erpBridge.ts:68`) | `src/lib/erpBridge.ts:84` |
+| `pzone_wizard_draft_v3_geo` | `WIZARD_DRAFT_KEY` (`src/pages/TenderNew.tsx:27`) | `src/pages/TenderNew.tsx:193` *(plus legacy `pzone_wizard_draft_v1`, no active writer)* |
+| `pzone_tender_log_header_expanded` | Inline key (`src/pages/Tenders.tsx:115`) | `src/pages/Tenders.tsx:125` |
+| `pzone_shown_device_notifs_<userId>` | Per-user key (`src/contexts/AppContext.tsx:336`) | `src/contexts/AppContext.tsx:402` |
+| Legacy `pzone_*` keys (if present) | e.g. `pzone_session_email`, `pzone_signed_out` | No active writers (removed in `feat/merge-platform`) |
+
+**Keys removed from `sessionStorage`:**
+- Every key starting with `pzone_` (`0` active writers in current code; removes any leftover legacy `pzone_admin_switch_user_id`).
+
+### 3. Button Code Before and After
+
+**Topbar (`src/components/layout/Topbar.tsx`) — Before (`lines 186-193`):**
+```tsx
+            <button
+              type="button"
+              onClick={signOut}
+              title={t('topbar.signOut')}
+              className="p-2 rounded-xl text-muted-foreground hover:text-pzone-crimson hover:bg-pzone-crimson/10 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+```
+
+**Topbar (`src/components/layout/Topbar.tsx`) — After (`lines 53-56, 192-201`):**
+```tsx
+  const handleBackToPortal = async () => {
+    await clearTenderLocalData();
+    window.location.assign(`${PORTAL_URL}/?stay=1`);
+  };
+...
+            <button
+              type="button"
+              onClick={() => void handleBackToPortal()}
+              title={t('topbar.backToPortal')}
+              aria-label={t('topbar.backToPortal')}
+              className="inline-flex items-center gap-1.5 p-2 xl:px-3 xl:py-1.5 rounded-xl text-xs font-semibold text-muted-foreground hover:text-pzone-teal hover:bg-pzone-teal/10 transition-colors cursor-pointer"
+            >
+              <LayoutGrid className="w-4 h-4 shrink-0" />
+              <span className="hidden xl:inline">{t('topbar.backToPortal')}</span>
+            </button>
+```
+
+**`NoAccessScreen` (`src/contexts/AppContext.tsx`) — Before (`lines 99-113`):**
+```tsx
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+          <a
+            href={PORTAL_URL}
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-pzone-navy hover:bg-pzone-navy/90 dark:bg-pzone-teal dark:hover:bg-pzone-teal/90 text-white text-xs font-semibold transition-colors text-center"
+          >
+            {t('noAccess.backToPortal')}
+          </a>
+          <button
+            type="button"
+            onClick={() => void onSignOut()}
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-muted hover:bg-muted/80 text-foreground border border-border text-xs font-semibold transition-colors cursor-pointer"
+          >
+            {t('noAccess.signOut')}
+          </button>
+        </div>
+```
+
+**`NoAccessScreen` (`src/contexts/AppContext.tsx`) — After (`lines 64-67, 97-106`):**
+```tsx
+  const handleBackToPortal = async () => {
+    await clearTenderLocalData();
+    window.location.assign(`${PORTAL_URL}/?stay=1`);
+  };
+...
+        <div className="flex items-center justify-center pt-2">
+          <button
+            type="button"
+            onClick={() => void handleBackToPortal()}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-pzone-navy hover:bg-pzone-navy/90 dark:bg-pzone-teal dark:hover:bg-pzone-teal/90 text-white text-xs font-semibold transition-colors cursor-pointer"
+          >
+            <LayoutGrid className="w-4 h-4 shrink-0" />
+            <span>{t('topbar.backToPortal')}</span>
+          </button>
+        </div>
+```
+
+### 4. Build & Grep Verification
+
+```bash
+$ npm run build
+
+> pzone-intelligent-tendering-system@1.0.0 build
+> vite build
+
+vite v6.4.3 building for production...
+transforming...
+✓ 2462 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     1.29 kB │ gzip:     0.63 kB
+dist/assets/index-CmrrlHWD.css    273.83 kB │ gzip:    31.53 kB
+dist/assets/index-DyYKRGv5.js   4,217.76 kB │ gzip: 1,022.07 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 8.00s
+```
+
+```bash
+$ grep -rn "signOut\|topbar.signOut" src
+# (no output, exit code 1 — signOut() export and all Sign Out buttons/keys deleted; Supabase SIGNED_OUT is handled via onAuthStateChange at src/contexts/AppContext.tsx:251-261)
+```
