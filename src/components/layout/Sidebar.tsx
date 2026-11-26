@@ -17,7 +17,6 @@ import {
   Monitor,
   Moon,
   Settings,
-  ShieldCheck,
   Sparkles,
   Sun,
   Table,
@@ -26,7 +25,6 @@ import {
   X,
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
-import { getProfiles, subscribeDataStore } from '@/lib/dataStore';
 import {
   canManageAdmin,
   canManageFxAndCatalog,
@@ -38,9 +36,6 @@ export const Sidebar: React.FC = () => {
   const { t } = useTranslation();
   const {
     user,
-    authenticatedUser,
-    isRealAppAdmin,
-    isSwitchingUser,
     theme,
     setTheme,
     language,
@@ -50,22 +45,10 @@ export const Sidebar: React.FC = () => {
     setMobileMenuOpen,
     isRtl,
     unreadNotificationsCount,
-    switchActiveUser,
-    resetSwitchedUser,
   } = useApp();
 
   const location = useLocation();
   const navigate = useNavigate();
-
-  const [storeVersion, setStoreVersion] = useState(0);
-  useEffect(() => {
-    return subscribeDataStore(() => setStoreVersion((v) => v + 1));
-  }, []);
-
-  const activeUsers = useMemo(() => {
-    void storeVersion;
-    return getProfiles().filter((p) => p.active);
-  }, [storeVersion]);
 
   type NavItem = {
     to: string;
@@ -588,62 +571,8 @@ export const Sidebar: React.FC = () => {
               })}
             </nav>
 
-            {/* Mobile Theme & App Admin–Exclusive User Switcher */}
+            {/* Mobile Theme Switcher */}
             <div className="p-4 border-t border-white/10 space-y-3 bg-black/25">
-              {user && isRealAppAdmin && (
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-mono uppercase tracking-wider text-cyan-200/70 flex items-center gap-1">
-                      <ShieldCheck className="w-3.5 h-3.5 text-pzone-cyan" />
-                      {isSwitchingUser
-                        ? language === 'ar'
-                          ? 'عرض بصلاحية مستخدم'
-                          : 'Viewing as User'
-                        : language === 'ar'
-                          ? 'تبديل المستخدم (Admin)'
-                          : 'Switch User (Admin Only)'}
-                    </span>
-                    {isSwitchingUser && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          resetSwitchedUser();
-                          setMobileMenuOpen(false);
-                        }}
-                        className="px-2 py-0.5 rounded-md bg-pzone-magenta text-white text-[10px] font-bold"
-                      >
-                        {language === 'ar' ? 'رجوع للمدير' : 'Back to Admin'}
-                      </button>
-                    )}
-                  </div>
-                  <select
-                    value={user.id}
-                    onChange={(e) => {
-                      switchActiveUser(e.target.value);
-                      setMobileMenuOpen(false);
-                    }}
-                    className="w-full rounded-xl bg-white/10 border border-white/15 px-3 py-2 text-xs font-semibold text-white"
-                  >
-                    {activeUsers.map((p) => {
-                      const isSelfAdmin = authenticatedUser?.id === p.id;
-                      const baseLabel =
-                        language === 'ar' && p.full_name_ar
-                          ? `${p.full_name_ar} — ${t(`roles.${p.role}`)}`
-                          : `${p.full_name} — ${t(`roles.${p.role}`)}`;
-                      return (
-                        <option
-                          key={p.id}
-                          value={p.id}
-                          className="bg-[#0B132B] text-white"
-                        >
-                          {isSelfAdmin ? `${baseLabel} (Admin)` : baseLabel}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
-              )}
-
               <div className="grid grid-cols-3 gap-1.5">
                 {themeOptions.map((opt) => {
                   const Icon = opt.icon;

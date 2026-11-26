@@ -84,6 +84,13 @@ export const resources = {
         quickDemoSubtitle: 'Explore the interface immediately with any of the 7 system role profiles:',
         enterAs: 'Enter as',
       },
+      noAccess: {
+        title: 'Access Restricted',
+        message:
+          "You don't have access to the Tender system. Ask your administrator to give you a Tender role in the Portal.",
+        backToPortal: 'Back to Portal',
+        signOut: 'Sign out',
+      },
       home: {
         greetingMorning: 'Good morning',
         greetingAfternoon: 'Good afternoon',
@@ -141,6 +148,11 @@ export const resources = {
           team: 'Discipline / Department',
           saveChanges: 'Save Gmail User',
           cancel: 'Cancel',
+          portalConsoleNotice: 'Users, roles and access are managed in the Portal Console',
+          openPortalConsole: 'Portal Console',
+          teamPlaceholder: 'e.g. Civil Engineering',
+          saveTeam: 'Save',
+          teamSaved: 'Updated team for {{name}}',
         },
         lookups: {
           title: 'Dynamic Dropdown Lists (`lookup_values`)',
@@ -311,6 +323,13 @@ export const resources = {
         quickDemoSubtitle: 'يمكنك تجربة النظام فوراً بأي من الأدوار السبعة المعتمدة في النظام:',
         enterAs: 'الدخول كـ',
       },
+      noAccess: {
+        title: 'غير مصرح بالدخول',
+        message:
+          'ليس لديك صلاحية للوصول إلى نظام المناقصات. يرجى التواصل مع مسؤول النظام لمنحك دوراً في نظام المناقصات عبر البوابة.',
+        backToPortal: 'العودة إلى البوابة',
+        signOut: 'تسجيل الخروج',
+      },
       home: {
         greetingMorning: 'صباح الخير',
         greetingAfternoon: 'طاب مساؤك',
@@ -368,6 +387,11 @@ export const resources = {
           team: 'التخصص / القسم',
           saveChanges: 'حفظ حساب Gmail',
           cancel: 'إلغاء',
+          portalConsoleNotice: 'تتم إدارة المستخدمين والأدوار والصلاحيات في لوحة تحكم البوابة (Portal Console)',
+          openPortalConsole: 'لوحة تحكم البوابة',
+          teamPlaceholder: 'مثال: الهندسة المدنية',
+          saveTeam: 'حفظ',
+          teamSaved: 'تم تحديث التخصص للمستخدم {{name}}',
         },
         lookups: {
           title: 'إدارة القوائم المنسدلة الديناميكية (`lookup_values`)',

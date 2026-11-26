@@ -157,7 +157,7 @@ import {
   getActiveErpTenderContext,
   nowCairoIso,
   recordErpAuditAndNotification,
-  saveCommercialBidSnapshotForTender,
+  resolveCurrentErpActor,
   syncAllErpTendersAndCostsToTenderLog,
   todayCairoIso,
 } from '../lib/erpBridge';
@@ -300,6 +300,16 @@ export default function CommercialBidPricePortal({ onOpenDatabaseTable, onNaviga
   const [employeeDirectorySearchQuery, setEmployeeDirectorySearchQuery] = useState('');
   const [employeeDirectoryDeptFilter, setEmployeeDirectoryDeptFilter] = useState('ALL');
 
+  // Commercial BOQ PPTX Presentation Options (persisted per tender in commercial_config)
+  const [templateId, setTemplateId] = useState('executive_navy');
+  const [tableMode, setTableMode] = useState('full_boq');
+  const [pumpRoomSeparate, setPumpRoomSeparate] = useState(true);
+  const [granularity, setGranularity] = useState('work_types');
+  const [includeCoverSlide, setIncludeCoverSlide] = useState(true);
+  const [includeSummarySlide, setIncludeSummarySlide] = useState(true);
+
+  const hydratedTenderIdRef = useRef(null);
+
   // Table Filtering & Search States
   const [proposalsSearchQuery, setProposalsSearchQuery] = useState('');
   const [proposalsStatusFilter, setProposalsStatusFilter] = useState('ALL');
@@ -318,6 +328,103 @@ export default function CommercialBidPricePortal({ onOpenDatabaseTable, onNaviga
   useEffect(() => {
     loadReferenceData();
   }, []);
+
+  // Hydrate saved commercial_config inputs (or reset to defaults) when selected tender changes
+  useEffect(() => {
+    if (!selectedTenderId || tendersList.length === 0) return;
+    if (hydratedTenderIdRef.current === String(selectedTenderId)) return;
+
+    const targetRow = tendersList.find(
+      (t) => String(t.id) === String(selectedTenderId)
+    );
+    if (!targetRow) return;
+
+    hydratedTenderIdRef.current = String(selectedTenderId);
+
+    const cfgObj =
+      targetRow.commercial_config &&
+      typeof targetRow.commercial_config === 'object' &&
+      !Array.isArray(targetRow.commercial_config)
+        ? targetRow.commercial_config
+        : null;
+    const inp =
+      cfgObj?.inputs &&
+      typeof cfgObj.inputs === 'object' &&
+      !Array.isArray(cfgObj.inputs)
+        ? cfgObj.inputs
+        : null;
+
+    if (!cfgObj || !inp) {
+      setActiveWorkTypeTab('ALL');
+      setGlobalFinancialConfig(getDefaultGlobalFinancialSettings());
+      setDisciplineMargins({ ...DEFAULT_DISCIPLINE_MARGINS });
+      setWorkTypeSpecificMargins({});
+      setSiteStaffRoster(DEFAULT_SITE_STAFF.map((s) => ({ ...s })));
+      setTemplateId('executive_navy');
+      setTableMode('full_boq');
+      setPumpRoomSeparate(true);
+      setGranularity('work_types');
+      setIncludeCoverSlide(true);
+      setIncludeSummarySlide(true);
+      return;
+    }
+
+    setActiveWorkTypeTab(
+      typeof inp.activeWorkTypeTab === 'string' ? inp.activeWorkTypeTab : 'ALL'
+    );
+    setGlobalFinancialConfig(
+      inp.globalFinancialConfig &&
+        typeof inp.globalFinancialConfig === 'object' &&
+        !Array.isArray(inp.globalFinancialConfig)
+        ? {
+            ...getDefaultGlobalFinancialSettings(),
+            ...inp.globalFinancialConfig,
+          }
+        : getDefaultGlobalFinancialSettings()
+    );
+    setDisciplineMargins(
+      inp.disciplineMargins &&
+        typeof inp.disciplineMargins === 'object' &&
+        !Array.isArray(inp.disciplineMargins)
+        ? {
+            ...DEFAULT_DISCIPLINE_MARGINS,
+            ...inp.disciplineMargins,
+          }
+        : { ...DEFAULT_DISCIPLINE_MARGINS }
+    );
+    setWorkTypeSpecificMargins(
+      inp.workTypeSpecificMargins &&
+        typeof inp.workTypeSpecificMargins === 'object' &&
+        !Array.isArray(inp.workTypeSpecificMargins)
+        ? { ...inp.workTypeSpecificMargins }
+        : {}
+    );
+    setSiteStaffRoster(
+      Array.isArray(inp.siteStaffRoster)
+        ? inp.siteStaffRoster.map((s) => ({ ...s }))
+        : DEFAULT_SITE_STAFF.map((s) => ({ ...s }))
+    );
+    setTemplateId(
+      typeof inp.templateId === 'string' ? inp.templateId : 'executive_navy'
+    );
+    setTableMode(
+      typeof inp.tableMode === 'string' ? inp.tableMode : 'full_boq'
+    );
+    setPumpRoomSeparate(
+      typeof inp.pumpRoomSeparate === 'boolean' ? inp.pumpRoomSeparate : true
+    );
+    setGranularity(
+      typeof inp.granularity === 'string' ? inp.granularity : 'work_types'
+    );
+    setIncludeCoverSlide(
+      typeof inp.includeCoverSlide === 'boolean' ? inp.includeCoverSlide : true
+    );
+    setIncludeSummarySlide(
+      typeof inp.includeSummarySlide === 'boolean'
+        ? inp.includeSummarySlide
+        : true
+    );
+  }, [selectedTenderId, tendersList]);
 
   const fetchAllBreakdownItems = async () => {
     let allItems = [];
@@ -1493,32 +1600,74 @@ export default function CommercialBidPricePortal({ onOpenDatabaseTable, onNaviga
     try {
       const summaryNotes = `[Commercial Overheads: Weighted Margin ${calculatedFinancials.weightedAvgMarginPct}%, Duration ${wholeProjectDuration.days}d, Total Bid: ${calculatedFinancials.finalBidPrice.toLocaleString()} EGP]`;
       const cleanedNotes = String(activeTender?.notes || '').replace(/\[Commercial Overheads:.*?\]/g, '').trim();
-      
-      const { error } = await supabase
-        .from('tender_log')
-        .update({
-          commercial_overheads: Number(calculatedFinancials.weightedAvgMarginPct || 18),
-          notes: `${cleanedNotes} ${summaryNotes}`.trim(),
-          ...buildErpAuditFields(true)
-        })
-        .eq('id', selectedTenderId);
-
-      if (error) throw error;
+      const nextOverheads = Number(calculatedFinancials.weightedAvgMarginPct || 18);
+      const nextNotes = `${cleanedNotes} ${summaryNotes}`.trim();
 
       const civilBid = Number(calculatedFinancials.disciplineBreakdown?.Civil?.discBidPrice || 0);
       const mechBid = Number(calculatedFinancials.disciplineBreakdown?.Mechanical?.discBidPrice || 0);
       const elecBid = Number(calculatedFinancials.disciplineBreakdown?.Electrical?.discBidPrice || 0);
+      const savedAt = nowCairoIso();
+      const actor = resolveCurrentErpActor();
 
-      // Persist exact custom Commercial Bid snapshot so PZ.Tender Log reflects the exact custom overheads & margins
-      saveCommercialBidSnapshotForTender(String(selectedTenderId), {
+      const snapshot = {
         directTotal: Number(calculatedFinancials.directTotal || 0),
         civilBidPrice: civilBid,
         mechBidPrice: mechBid,
         elecBidPrice: elecBid,
         finalBidPrice: Number(calculatedFinancials.finalBidPrice || 0),
         weightedAvgMarginPct: Number(calculatedFinancials.weightedAvgMarginPct || 0),
-        updatedAt: nowCairoIso(),
-      });
+        updatedAt: savedAt,
+      };
+
+      const commercialConfig = {
+        version: 1,
+        inputs: {
+          activeWorkTypeTab,
+          globalFinancialConfig,
+          disciplineMargins,
+          workTypeSpecificMargins,
+          siteStaffRoster,
+          templateId,
+          tableMode,
+          pumpRoomSeparate,
+          granularity,
+          includeCoverSlide,
+          includeSummarySlide,
+        },
+        snapshot,
+        saved_at: savedAt,
+        saved_by: {
+          id: actor.id,
+          full_name: actor.full_name,
+        },
+      };
+
+      const auditFields = buildErpAuditFields(true);
+      const { error } = await supabase
+        .from('tender_log')
+        .update({
+          commercial_overheads: nextOverheads,
+          notes: nextNotes,
+          commercial_config: commercialConfig,
+          ...auditFields,
+        })
+        .eq('id', selectedTenderId);
+
+      if (error) throw error;
+
+      setTendersList(prev =>
+        prev.map(t =>
+          String(t.id) === String(selectedTenderId)
+            ? {
+                ...t,
+                commercial_overheads: nextOverheads,
+                notes: nextNotes,
+                commercial_config: commercialConfig,
+                ...auditFields,
+              }
+            : t
+        )
+      );
 
       // Push calculated Civil, Mechanical, Electrical & Final Bid Price back to PZ.Tender Log
       await syncAllErpTendersAndCostsToTenderLog();
@@ -4687,6 +4836,18 @@ export default function CommercialBidPricePortal({ onOpenDatabaseTable, onNaviga
         calculatedFinancials={calculatedFinancials}
         boqWorkTypes={boqWorkTypesList}
         catalogItems={catalogItemsList}
+        templateId={templateId}
+        setTemplateId={setTemplateId}
+        tableMode={tableMode}
+        setTableMode={setTableMode}
+        pumpRoomSeparate={pumpRoomSeparate}
+        setPumpRoomSeparate={setPumpRoomSeparate}
+        granularity={granularity}
+        setGranularity={setGranularity}
+        includeCoverSlide={includeCoverSlide}
+        setIncludeCoverSlide={setIncludeCoverSlide}
+        includeSummarySlide={includeSummarySlide}
+        setIncludeSummarySlide={setIncludeSummarySlide}
       />
 
     </div>

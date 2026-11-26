@@ -1,50 +1,40 @@
-import { createClient } from '@supabase/supabase-js';
-import type { ExchangeRate, LookupValue, Profile } from '@/types/database';
+// One client for the company Supabase project. The session is a cookie on the parent domain,
+// shared with the Portal (erp.pzoneinternational.com) and every other company system (SSO).
+import { createBrowserClient } from '@supabase/ssr';
+import type { ExchangeRate, LookupValue } from '@/types/database';
 
-const supabaseUrl =
-  import.meta.env.VITE_TENDER_LOG_SUPABASE_URL ||
-  import.meta.env.VITE_SUPABASE_URL ||
-  'https://your-project-ref.supabase.co';
-const supabaseAnonKey =
-  import.meta.env.VITE_TENDER_LOG_SUPABASE_ANON_KEY ||
-  import.meta.env.VITE_SUPABASE_ANON_KEY ||
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-  'placeholder-anon-key';
+const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
 
-export const isSupabaseConfigured =
-  import.meta.env.MODE !== 'test' &&
-  Boolean(supabaseUrl) &&
-  Boolean(supabaseAnonKey) &&
-  !String(supabaseUrl).includes('your-project-ref') &&
-  !String(supabaseUrl).includes('placeholder');
+if (!url || !key) {
+  throw new Error('[Supabase] VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY are missing');
+}
+// Safety net: a secret key must never reach the browser.
+if (key.startsWith('sb_secret_') || key.includes('service_role')) {
+  throw new Error('[Supabase] A secret key was configured in the browser. Use the publishable key.');
+}
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-  },
+// These cookie options MUST stay exactly like this. They are identical in every company app.
+function buildCookieOptions(domain: string | undefined, protocol: string) {
+  return {
+    domain: domain || undefined,
+    path: '/',
+    sameSite: 'lax' as const,
+    secure: protocol === 'https:',
+    maxAge: 400 * 24 * 60 * 60,
+  };
+}
+
+// Default schema = tender, so every existing `.from('<table>')` keeps working unchanged.
+export const supabase = createBrowserClient(url, key, {
+  db: { schema: 'tender' },
+  cookieOptions: buildCookieOptions(import.meta.env.VITE_AUTH_COOKIE_DOMAIN, window.location.protocol),
 });
 
-export const PRIMARY_APP_ADMIN_EMAIL = 'amr.faisal.elaraby@gmail.com';
-
-export const PRIMARY_APP_ADMIN_PROFILE: Profile = {
-  id: '00000000-0000-4000-8000-000000000001',
-  full_name: 'Amr Faisal El-Araby',
-  full_name_ar: 'عمرو فيصل العربي',
-  role: 'app_admin',
-  team: 'App Administration',
-  email: PRIMARY_APP_ADMIN_EMAIL,
-  phone: null,
-  preferred_theme: 'system',
-  preferred_lang: 'en',
-  active: true,
-  created_at: '2026-11-16T14:00:00+02:00',
-  updated_at: '2026-11-16T14:00:00+02:00',
-};
-
-export const SEEDED_PROFILES: Profile[] = [
-  PRIMARY_APP_ADMIN_PROFILE,
-];
+export const SYSTEM = 'tender';
+export const PORTAL_URL =
+  (import.meta.env.VITE_PORTAL_URL as string | undefined) || 'https://erp.pzoneinternational.com';
+export const isSupabaseConfigured = import.meta.env.MODE !== 'test';
 
 /**
  * Full seeded lookup values matching `/supabase/seed.sql` (Section 9: never hard-code dropdown values).

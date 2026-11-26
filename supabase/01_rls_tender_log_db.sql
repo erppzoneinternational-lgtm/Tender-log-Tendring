@@ -1,3 +1,4 @@
+-- OLD (before the merged platform). Do not run on the company project.
 -- =============================================================================
 -- P.ZONE Unified Tendering System — Database 1 Safe RLS Policies
 -- Target Supabase Project: gjfqnmustacsmwvccvou (PZ.Tender Log, Profiles & Audit)

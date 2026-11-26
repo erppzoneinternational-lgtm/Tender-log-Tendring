@@ -11,7 +11,7 @@ import {
   Zap,
   HardDrive
 } from 'lucide-react';
-import { supabase, supabaseUrl } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { SCHEMA_CATEGORIES, TABLES_CONFIG } from '../lib/schemaData';
 
 export default function DatabaseHealth({ tableCounts, onRefreshAll, isRefreshing }) {
@@ -137,7 +137,7 @@ export default function DatabaseHealth({ tableCounts, onRefreshAll, isRefreshing
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono text-xs">
           <div className="p-3.5 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800">
             <p className="text-[11px] text-slate-500 uppercase tracking-wider mb-1">Project URL</p>
-            <p className="text-slate-800 dark:text-slate-200 truncate select-all">{supabaseUrl}</p>
+            <p className="text-slate-800 dark:text-slate-200 truncate select-all">{import.meta.env.VITE_SUPABASE_URL}</p>
           </div>
 
           <div className="p-3.5 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800">

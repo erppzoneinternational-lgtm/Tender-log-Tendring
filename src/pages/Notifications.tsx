@@ -207,7 +207,7 @@ const EVENT_TYPE_META: {
 ];
 
 export const Notifications: React.FC = () => {
-  const { user, isRealAppAdmin, lang } = useApp();
+  const { user, lang } = useApp();
   const navigate = useNavigate();
 
   const [version, setVersion] = useState(0);
@@ -291,7 +291,7 @@ export const Notifications: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 relative z-10">
-          {(isRealAppAdmin || canManageAdmin(user.role)) && (
+          {canManageAdmin(user.role) && (
             <button
               type="button"
               onClick={() => {

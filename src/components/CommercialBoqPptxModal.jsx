@@ -69,15 +69,40 @@ export default function CommercialBoqPptxModal({
   calculatedFinancials = {},
   boqWorkTypes = [],
   catalogItems = [],
+  templateId: controlledTemplateId,
+  setTemplateId: setControlledTemplateId,
+  tableMode: controlledTableMode,
+  setTableMode: setControlledTableMode,
+  pumpRoomSeparate: controlledPumpRoomSeparate,
+  setPumpRoomSeparate: setControlledPumpRoomSeparate,
+  granularity: controlledGranularity,
+  setGranularity: setControlledGranularity,
+  includeCoverSlide: controlledIncludeCoverSlide,
+  setIncludeCoverSlide: setControlledIncludeCoverSlide,
+  includeSummarySlide: controlledIncludeSummarySlide,
+  setIncludeSummarySlide: setControlledIncludeSummarySlide,
 }) {
-  const [templateId, setTemplateId] = useState('executive_navy');
-  const [tableMode, setTableMode] = useState('full_boq');
-  const [pumpRoomSeparate, setPumpRoomSeparate] = useState(true);
-  const [granularity, setGranularity] = useState('work_types');
-  const [includeCoverSlide, setIncludeCoverSlide] = useState(true);
-  const [includeSummarySlide, setIncludeSummarySlide] = useState(true);
+  const [localTemplateId, setLocalTemplateId] = useState('executive_navy');
+  const [localTableMode, setLocalTableMode] = useState('full_boq');
+  const [localPumpRoomSeparate, setLocalPumpRoomSeparate] = useState(true);
+  const [localGranularity, setLocalGranularity] = useState('work_types');
+  const [localIncludeCoverSlide, setLocalIncludeCoverSlide] = useState(true);
+  const [localIncludeSummarySlide, setLocalIncludeSummarySlide] = useState(true);
   const [activeSlideTab, setActiveSlideTab] = useState('summary'); // 'cover' | 'summary' | component.key
   const [isExporting, setIsExporting] = useState(false);
+
+  const templateId = controlledTemplateId ?? localTemplateId;
+  const setTemplateId = setControlledTemplateId ?? setLocalTemplateId;
+  const tableMode = controlledTableMode ?? localTableMode;
+  const setTableMode = setControlledTableMode ?? setLocalTableMode;
+  const pumpRoomSeparate = controlledPumpRoomSeparate ?? localPumpRoomSeparate;
+  const setPumpRoomSeparate = setControlledPumpRoomSeparate ?? setLocalPumpRoomSeparate;
+  const granularity = controlledGranularity ?? localGranularity;
+  const setGranularity = setControlledGranularity ?? setLocalGranularity;
+  const includeCoverSlide = controlledIncludeCoverSlide ?? localIncludeCoverSlide;
+  const setIncludeCoverSlide = setControlledIncludeCoverSlide ?? setLocalIncludeCoverSlide;
+  const includeSummarySlide = controlledIncludeSummarySlide ?? localIncludeSummarySlide;
+  const setIncludeSummarySlide = setControlledIncludeSummarySlide ?? setLocalIncludeSummarySlide;
 
   const activeTheme =
     PPTX_TEMPLATE_THEMES[templateId] || PPTX_TEMPLATE_THEMES.executive_navy;

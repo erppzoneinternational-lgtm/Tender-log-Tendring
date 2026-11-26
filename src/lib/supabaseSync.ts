@@ -64,18 +64,7 @@ function sanitizeRowForSupabase(
     delete row.id;
   }
 
-  if (table === 'profiles') {
-    delete row.can_access_commercial_overheads;
-    delete row.module_permissions;
-    // Map extended 9-role presets onto the 7 PostgreSQL CHECK-allowed roles while
-    // preserving full preset & 8-module matrix inside `lookup_values` (`user_access_matrix`).
-    if (
-      row.role === 'commercial_approver' ||
-      row.role === 'procurement_cost_control'
-    ) {
-      row.role = 'tender_manager';
-    }
-  } else if (table === 'lookup_values') {
+  if (table === 'lookup_values') {
     row.parent_id = asUuidOrNull(row.parent_id);
     row.created_by = asValidProfileFkOrNull(row.created_by);
     row.updated_by = asValidProfileFkOrNull(row.updated_by);
@@ -168,7 +157,7 @@ export function syncArrayDiffToSupabase(
   prevRows: Record<string, unknown>[],
   nextRows: Record<string, unknown>[]
 ): Promise<void> {
-  if (!isSupabaseConfigured || isHydrating) return Promise.resolve();
+  if (!isSupabaseConfigured || isHydrating || table === 'profiles') return Promise.resolve();
 
   const prevMap = new Map<string, Record<string, unknown>>();
   for (const r of prevRows) {
@@ -266,15 +255,7 @@ export function syncArrayDiffToSupabase(
           .from(table)
           .upsert(rowsWithId, { onConflict: 'id' });
         if (upsErr) {
-          if (table === 'profiles' && upsErr.message?.toLowerCase().includes('email')) {
-            for (const pRow of rowsWithId) {
-              const em = typeof pRow.email === 'string' ? pRow.email.trim().toLowerCase() : '';
-              if (!em) continue;
-              const patchRow = { ...pRow };
-              delete patchRow.id;
-              await supabase.from('profiles').update(patchRow).ilike('email', em);
-            }
-          } else if (
+          if (
             table === 'tasks' &&
             upsErr.message?.toLowerCase().includes('tasks_tender_id_key')
           ) {
@@ -456,10 +437,10 @@ export function startSupabaseRealtimeSubscription(
     .channel('pzone-tender-log-live')
     .on(
       'postgres_changes',
-      { event: '*', schema: 'public' },
+      { event: '*', schema: 'tender' },
       (payload) => {
         const tbl = payload.table as SyncTableKey;
-        if (tbl) {
+        if (tbl && tbl !== 'profiles') {
           scheduleRefresh(tbl);
         }
       }

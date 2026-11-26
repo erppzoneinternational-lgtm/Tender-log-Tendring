@@ -1,9 +1,9 @@
 import React from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AppProvider, useApp } from '@/contexts/AppContext';
+import { AppProvider, goToPortalLogin, useApp } from '@/contexts/AppContext';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Login } from '@/pages/Login';
+import { RibbonLoader } from '@/components/ui/RibbonLoader';
 import { Dashboard } from '@/pages/Dashboard';
 import { Tenders } from '@/pages/Tenders';
 import { TenderNew } from '@/pages/TenderNew';
@@ -35,10 +35,21 @@ const queryClient = new QueryClient({
   },
 });
 
+function LoginRedirect() {
+  React.useEffect(() => {
+    goToPortalLogin();
+  }, []);
+  return null;
+}
+
 function ProtectedRoutes() {
-  const { user } = useApp();
-  if (!user) {
-    return <Navigate to="/login" replace />;
+  const { user, loading } = useApp();
+  if (loading || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <RibbonLoader size="lg" />
+      </div>
+    );
   }
   return <AppLayout />;
 }
@@ -110,10 +121,7 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route
-        path="/login"
-        element={user ? <Navigate to="/" replace /> : <Login />}
-      />
+      <Route path="/login" element={<LoginRedirect />} />
 
       <Route element={<ProtectedRoutes />}>
         {/* PZ.Tender Log Core Routes */}
